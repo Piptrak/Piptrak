@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Piptrak Brand Guidelines</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Times New Roman',Times,serif;background:#090c12;color:#c8d8f0;padding:48px 24px}
+    .wrap{max-width:900px;margin:0 auto}
+    h1{font-size:36px;font-weight:700;font-style:italic;color:#e0eaff;margin-bottom:6px}
+    .sub{font-size:14px;color:#445;letter-spacing:3px;text-transform:uppercase;margin-bottom:48px}
+    h2{font-size:18px;font-weight:700;font-style:italic;color:#e0eaff;margin:40px 0 16px;border-left:3px solid #1e4d8c;padding-left:14px}
+    .card{background:#0f1520;border:1px solid #1e2a40;border-radius:12px;padding:24px;margin-bottom:16px}
+    .color-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px}
+    .swatch{border-radius:10px;overflow:hidden}
+    .swatch-color{height:80px}
+    .swatch-info{padding:10px 12px;background:#0a0e18}
+    .swatch-name{font-size:12px;font-weight:700;color:#e0eaff;font-style:italic}
+    .swatch-hex{font-size:11px;color:#445;margin-top:2px;font-family:monospace}
+    .swatch-use{font-size:10px;color:#556;margin-top:4px;font-style:italic}
+    .logo-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+    .logo-box{border-radius:10px;padding:32px;display:flex;flex-direction:column;align-items:center;gap:16px}
+    .logo-box-dark{background:#090c12;border:1px solid #1e2a40}
+    .logo-box-light{background:#f0f4f8;border:1px solid #ddd}
+    .logo-label{font-size:11px;color:#445;letter-spacing:2px;text-transform:uppercase;font-style:italic}
+    .wordmark{font-family:'Times New Roman',Times,serif;font-weight:700;font-style:italic}
+    .type-sample{margin-bottom:12px}
+    .type-name{font-size:10px;color:#445;letter-spacing:2px;text-transform:uppercase;margin-bottom:6px}
+    .dont-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .dont-item{background:#1a0d14;border:1px solid #ff3b5c33;border-radius:8px;padding:16px;font-size:12px;color:#778;font-style:italic}
+    .dont-item::before{content:"✗ ";color:#ff3b5c;font-weight:700}
+    .do-item{background:#0d2a1a;border:1px solid #00ff8833;border-radius:8px;padding:16px;font-size:12px;color:#778;font-style:italic}
+    .do-item::before{content:"✓ ";color:#00ff88;font-weight:700}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Piptrak</h1>
+  <div class="sub">Brand Guidelines v1.0</div>
+
+  <!-- LOGO -->
+  <h2>Logo</h2>
+  <div class="logo-grid">
+    <div class="logo-box logo-box-dark">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="80" height="80">
+        <defs>
+          <linearGradient id="hg" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:#1e4d8c"/><stop offset="100%" style="stop-color:#0d2a50"/></linearGradient>
+          <linearGradient id="lg" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" style="stop-color:#1e4d8c"/><stop offset="100%" style="stop-color:#00ff88"/></linearGradient>
+        </defs>
+        <polygon points="100,15 175,57.5 175,142.5 100,185 25,142.5 25,57.5" fill="url(#hg)" stroke="#1e4d8c" stroke-width="2"/>
+        <polyline points="52,130 72,118 88,124 108,95 124,105 148,72" fill="none" stroke="url(#lg)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+        <circle cx="148" cy="72" r="5" fill="#00ff88"/>
+        <circle cx="148" cy="72" r="9" fill="none" stroke="#00ff88" stroke-width="1.5" opacity="0.4"/>
+      </svg>
+      <div style="font-size:24px;font-weight:700;font-style:italic;color:#e0eaff">Pip<span style="color:#4db8ff">trak</span></div>
+      <div class="logo-label">Primary — Dark background</div>
+    </div>
+    <div class="logo-box logo-box-light">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="80" height="80">
+        <defs>
+          <linearGradient id="hg2" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:#1e4d8c"/><stop offset="100%" style="stop-color:#0d2a50"/></linearGradient>
+          <linearGradient id="lg2" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" style="stop-color:#1e4d8c"/><stop offset="100%" style="stop-color:#00aa55"/></linearGradient>
+        </defs>
+        <polygon points="100,15 175,57.5 175,142.5 100,185 25,142.5 25,57.5" fill="url(#hg2)"/>
+        <polyline points="52,130 72,118 88,124 108,95 124,105 148,72" fill="none" stroke="url(#lg2)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+        <circle cx="148" cy="72" r="5" fill="#00aa55"/>
+      </svg>
+      <div style="font-size:24px;font-weight:700;font-style:italic;color:#0d2a50">Pip<span style="color:#1e4d8c">trak</span></div>
+      <div style="font-size:11px;color:#888;letter-spacing:2px;text-transform:uppercase;font-style:italic">Light background variant</div>
+    </div>
+  </div>
+
+  <!-- COLORS -->
+  <h2>Colour Palette</h2>
+  <div class="color-grid">
+    <div class="swatch">
+      <div class="swatch-color" style="background:#090c12"></div>
+      <div class="swatch-info"><div class="swatch-name">Void</div><div class="swatch-hex">#090c12</div><div class="swatch-use">Primary background</div></div>
+    </div>
+    <div class="swatch">
+      <div class="swatch-color" style="background:#0f1520"></div>
+      <div class="swatch-info"><div class="swatch-name">Deep Navy</div><div class="swatch-hex">#0f1520</div><div class="swatch-use">Card backgrounds</div></div>
+    </div>
+    <div class="swatch">
+      <div class="swatch-color" style="background:#1e4d8c"></div>
+      <div class="swatch-info"><div class="swatch-name">Brand Blue</div><div class="swatch-hex">#1e4d8c</div><div class="swatch-use">Primary action colour</div></div>
+    </div>
+    <div class="swatch">
+      <div class="swatch-color" style="background:#4db8ff"></div>
+      <div class="swatch-info"><div class="swatch-name">Electric Blue</div><div class="swatch-hex">#4db8ff</div><div class="swatch-use">Highlights, active states</div></div>
+    </div>
+    <div class="swatch">
+      <div class="swatch-color" style="background:#00ff88"></div>
+      <div class="swatch-info"><div class="swatch-name">Pip Green</div><div class="swatch-hex">#00ff88</div><div class="swatch-use">Profit, success, CTA</div></div>
+    </div>
+    <div class="swatch">
+      <div class="swatch-color" style="background:#ff3b5c"></div>
+      <div class="swatch-info"><div class="swatch-name">Loss Red</div><div class="swatch-hex">#ff3b5c</div><div class="swatch-use">Losses, alerts, danger</div></div>
+    </div>
+    <div class="swatch">
+      <div class="swatch-color" style="background:#f0c040"></div>
+      <div class="swatch-info"><div class="swatch-name">Alert Gold</div><div class="swatch-hex">#f0c040</div><div class="swatch-use">Warnings, in-progress</div></div>
+    </div>
+    <div class="swatch">
+      <div class="swatch-color" style="background:#c8a0ff"></div>
+      <div class="swatch-info"><div class="swatch-name">Analytics Purple</div><div class="swatch-hex">#c8a0ff</div><div class="swatch-use">R:R, analytics data</div></div>
+    </div>
+  </div>
+
+  <!-- TYPOGRAPHY -->
+  <h2>Typography</h2>
+  <div class="card">
+    <div class="type-sample">
+      <div class="type-name">Display / Headings</div>
+      <div style="font-size:32px;font-weight:700;font-style:italic;color:#e0eaff">Times New Roman Bold Italic</div>
+      <div style="font-size:13px;color:#445;margin-top:4px;font-style:italic">Used for: Logo, hero headlines, large numbers, P&L figures</div>
+    </div>
+    <div style="height:1px;background:#1e2a40;margin:20px 0"></div>
+    <div class="type-sample">
+      <div class="type-name">Body / UI</div>
+      <div style="font-size:16px;font-style:italic;color:#c8d8f0">Times New Roman Regular Italic</div>
+      <div style="font-size:13px;color:#445;margin-top:4px;font-style:italic">Used for: Body text, labels, descriptions, inputs</div>
+    </div>
+    <div style="height:1px;background:#1e2a40;margin:20px 0"></div>
+    <div class="type-sample">
+      <div class="type-name">Labels / Caps</div>
+      <div style="font-size:11px;color:#445;letter-spacing:3px;text-transform:uppercase">UPPERCASE TRACKING — FOR SECTION LABELS</div>
+      <div style="font-size:13px;color:#445;margin-top:4px;font-style:italic">Used for: Section labels, stat headers, badges</div>
+    </div>
+  </div>
+
+  <!-- TONE OF VOICE -->
+  <h2>Tone of Voice</h2>
+  <div class="card">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+      <div>
+        <div style="font-size:12px;color:#00ff88;letter-spacing:2px;text-transform:uppercase;margin-bottom:10px">We are</div>
+        <div style="font-size:13px;color:#778;font-style:italic;line-height:2">Direct and honest<br/>Trader-first, not corporate<br/>Confident but not arrogant<br/>Serious about the data<br/>Encouraging about the journey</div>
+      </div>
+      <div>
+        <div style="font-size:12px;color:#ff3b5c;letter-spacing:2px;text-transform:uppercase;margin-bottom:10px">We are not</div>
+        <div style="font-size:13px;color:#778;font-style:italic;line-height:2">Hype-driven or salesy<br/>Overly casual or using slang<br/>Financial advisors<br/>Promise-makers on returns<br/>Jargon-heavy or academic</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DOS AND DONTS -->
+  <h2>Logo Do's & Don'ts</h2>
+  <div class="dont-grid">
+    <div class="do-item">Use on dark backgrounds (#090c12 or similar)</div>
+    <div class="do-item">Maintain clear space equal to hex width around logo</div>
+    <div class="do-item">Use SVG format for all digital uses</div>
+    <div class="do-item">Use light variant on white/light backgrounds only</div>
+    <div class="dont-item">Stretch or distort the logo proportions</div>
+    <div class="dont-item">Change the logo colours outside the brand palette</div>
+    <div class="dont-item">Place the logo on busy photographic backgrounds</div>
+    <div class="dont-item">Add drop shadows, outlines or effects to the logo</div>
+  </div>
+
+  <!-- SOCIAL SIZES -->
+  <h2>Asset Sizes</h2>
+  <div class="card">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0">
+      {[
+        ["App Icon","1024×1024px PNG"],["Favicon","32×32px SVG"],
+        ["OG Image","1200×630px PNG"],["Twitter Header","1500×500px PNG"],
+        ["Profile Photo","400×400px PNG"],["App Splash","1242×2688px PNG"],
+      ].map(([n,s])=>``).join("")}
+    </div>
+    <table style="width:100%;border-collapse:collapse">
+      <tr style="border-bottom:1px solid #1e2a40"><td style="padding:8px 0;font-size:12px;color:#778;font-style:italic">App Icon</td><td style="padding:8px 0;font-size:12px;color:#445;text-align:right;font-style:italic">1024×1024px PNG</td></tr>
+      <tr style="border-bottom:1px solid #1e2a40"><td style="padding:8px 0;font-size:12px;color:#778;font-style:italic">Favicon</td><td style="padding:8px 0;font-size:12px;color:#445;text-align:right;font-style:italic">32×32px SVG</td></tr>
+      <tr style="border-bottom:1px solid #1e2a40"><td style="padding:8px 0;font-size:12px;color:#778;font-style:italic">Open Graph / Social Preview</td><td style="padding:8px 0;font-size:12px;color:#445;text-align:right;font-style:italic">1200×630px PNG</td></tr>
+      <tr style="border-bottom:1px solid #1e2a40"><td style="padding:8px 0;font-size:12px;color:#778;font-style:italic">Twitter Header</td><td style="padding:8px 0;font-size:12px;color:#445;text-align:right;font-style:italic">1500×500px PNG</td></tr>
+      <tr style="border-bottom:1px solid #1e2a40"><td style="padding:8px 0;font-size:12px;color:#778;font-style:italic">Profile Photo</td><td style="padding:8px 0;font-size:12px;color:#445;text-align:right;font-style:italic">400×400px PNG</td></tr>
+      <tr><td style="padding:8px 0;font-size:12px;color:#778;font-style:italic">App Splash Screen</td><td style="padding:8px 0;font-size:12px;color:#445;text-align:right;font-style:italic">1242×2688px PNG</td></tr>
+    </table>
+  </div>
+
+</div>
+</body>
+</html>

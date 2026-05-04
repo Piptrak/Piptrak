@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Share your results · Piptrak</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg"/>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Times New Roman',Times,serif;background:#090c12;color:#c8d8f0;min-height:100vh;padding:0 0 60px}
+    nav{background:#090c12;border-bottom:1px solid #1a2235;padding:14px 20px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:10}
+    .logo{font-size:20px;font-weight:700;font-style:italic;color:#e0eaff;text-decoration:none}
+    .logo span{color:#4db8ff}
+    .wrap{max-width:800px;margin:0 auto;padding:28px 20px}
+    h1{font-size:26px;font-weight:700;font-style:italic;color:#e0eaff;margin-bottom:6px}
+    .sub{font-size:13px;color:#445;font-style:italic;margin-bottom:28px}
+    .card{background:#0f1520;border:1px solid #1e2a40;border-radius:10px;padding:18px;margin-bottom:14px}
+    label{display:block;font-size:10px;color:#778;letter-spacing:1px;margin-bottom:6px}
+    input,select{background:#0a0f1a;border:1px solid #1e2a40;border-radius:8px;padding:10px 12px;color:#c8d8f0;font-family:'Times New Roman',Times,serif;font-size:14px;width:100%;outline:none;margin-bottom:14px;transition:border 0.2s;font-style:italic}
+    input:focus,select:focus{border-color:#3a5080}
+    .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .btn{padding:11px 24px;border-radius:8px;font-family:'Times New Roman',Times,serif;font-size:13px;cursor:pointer;border:none;font-style:italic;transition:all 0.2s}
+    .bp{background:#1e4d8c;color:#c8d8f0}.bp:hover{background:#2560b0}
+    .bg{background:transparent;border:1px solid #1e2a40;color:#778}.bg:hover{border-color:#3a5080;color:#c8d8f0}
+    .section-title{font-size:10px;color:#445;letter-spacing:3px;text-transform:uppercase;font-style:italic;margin:24px 0 14px}
+    .theme-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
+    .theme-btn{border-radius:8px;padding:12px 8px;cursor:pointer;border:2px solid transparent;text-align:center;font-size:11px;font-style:italic;transition:all 0.2s}
+    .theme-btn.active{border-color:#1e4d8c}
+
+    /* ── CARD PREVIEW ── */
+    #card-preview{width:600px;height:315px;border-radius:16px;padding:32px;position:relative;overflow:hidden;margin:0 auto 20px;display:flex;flex-direction:column;justify-content:space-between}
+    .preview-logo{font-size:14px;font-weight:700;font-style:italic}
+    .preview-main{flex:1;display:flex;align-items:center;gap:32px}
+    .preview-pnl{font-size:52px;font-weight:700;font-style:italic;line-height:1}
+    .preview-stats{display:flex;flex-direction:column;gap:8px}
+    .preview-stat{font-size:13px;font-style:italic;opacity:0.8}
+    .preview-footer{display:flex;justify-content:space-between;align-items:center;font-size:11px;opacity:0.6;font-style:italic}
+    .preview-watermark{font-size:11px;opacity:0.5;font-style:italic}
+    .preview-bar{height:4px;border-radius:2px;margin-top:6px}
+
+    /* Themes */
+    .theme-dark{background:linear-gradient(135deg,#090c12,#0f1520);color:#c8d8f0;border:1px solid #1e2a40}
+    .theme-navy{background:linear-gradient(135deg,#0d2a50,#1e4d8c);color:#e0eaff}
+    .theme-green{background:linear-gradient(135deg,#0a1a10,#0d2a1a);color:#c8d8f0;border:1px solid #00ff8822}
+    .theme-red{background:linear-gradient(135deg,#1a0a0d,#2a0d14);color:#c8d8f0;border:1px solid #ff3b5c22}
+
+    #download-btn{display:block;width:fit-content;margin:0 auto 8px}
+    .share-row{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+  </style>
+</head>
+<body>
+<nav>
+  <a href="/" class="logo">Pip<span>trak</span></a>
+  <span style="font-size:10px;color:#445;letter-spacing:2px;font-style:italic">SHARE YOUR RESULTS</span>
+  <a href="https://app.piptrak.com" style="font-size:12px;color:#4db8ff;font-style:italic;text-decoration:none">Dashboard →</a>
+</nav>
+
+<div class="wrap">
+  <h1>Share your results</h1>
+  <div class="sub">Generate a shareable P&L card for Twitter/X, Discord, or Instagram</div>
+
+  <div class="grid2">
+    <!-- Controls -->
+    <div>
+      <div class="card">
+        <div style="font-size:11px;color:#445;letter-spacing:2px;text-transform:uppercase;font-style:italic;margin-bottom:14px">Challenge Details</div>
+
+        <label>Account / Challenge Name</label>
+        <input type="text" id="acc-name" value="FTMO Challenge #1" oninput="updateCard()"/>
+
+        <label>Firm</label>
+        <select id="firm" oninput="updateCard()">
+          <option>FTMO</option><option>Funded Next</option><option>The5ers</option><option>MyFundedFX</option>
+        </select>
+
+        <div class="grid2">
+          <div>
+            <label>Total P&L ($)</label>
+            <input type="number" id="pnl" value="770" oninput="updateCard()"/>
+          </div>
+          <div>
+            <label>Account Size ($)</label>
+            <input type="number" id="size" value="10000" oninput="updateCard()"/>
+          </div>
+        </div>
+
+        <div class="grid2">
+          <div>
+            <label>Win Rate (%)</label>
+            <input type="number" id="winrate" value="71" min="0" max="100" oninput="updateCard()"/>
+          </div>
+          <div>
+            <label>R:R Ratio</label>
+            <input type="number" id="rr" value="2.4" step="0.1" oninput="updateCard()"/>
+          </div>
+        </div>
+
+        <div class="grid2">
+          <div>
+            <label>Total Trades</label>
+            <input type="number" id="trades" value="7" oninput="updateCard()"/>
+          </div>
+          <div>
+            <label>Status</label>
+            <select id="status" oninput="updateCard()">
+              <option value="progress">In Progress</option>
+              <option value="passed">Challenge Passed ✓</option>
+              <option value="funded">Now Funded! 🎉</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div style="font-size:11px;color:#445;letter-spacing:2px;text-transform:uppercase;font-style:italic;margin-bottom:14px">Card Theme</div>
+        <div class="theme-grid">
+          <div class="theme-btn theme-dark active" onclick="setTheme('dark',this)">
+            <div style="font-size:16px;margin-bottom:4px">🌑</div>Dark
+          </div>
+          <div class="theme-btn theme-navy" style="background:linear-gradient(135deg,#0d2a50,#1e4d8c)" onclick="setTheme('navy',this)">
+            <div style="font-size:16px;margin-bottom:4px">🔵</div>Navy
+          </div>
+          <div class="theme-btn theme-green" style="background:#0d2a1a;color:#00ff88" onclick="setTheme('green',this)">
+            <div style="font-size:16px;margin-bottom:4px">💚</div>Green
+          </div>
+          <div class="theme-btn theme-red" style="background:#2a0d14;color:#ff3b5c" onclick="setTheme('red',this)">
+            <div style="font-size:16px;margin-bottom:4px">❤️</div>Loss
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Preview -->
+    <div>
+      <div class="section-title" style="margin-top:0">Preview (1200×630)</div>
+      <div id="card-preview" class="theme-dark">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div class="preview-logo">Pip<span style="color:#4db8ff">trak</span></div>
+          <div id="prev-status" style="font-size:11px;color:#f0c040;background:#f0c04018;padding:4px 12px;border-radius:20px;font-style:italic">IN PROGRESS</div>
+        </div>
+        <div class="preview-main">
+          <div>
+            <div style="font-size:12px;color:#445;letter-spacing:2px;font-style:italic;margin-bottom:4px">TOTAL P&L</div>
+            <div class="preview-pnl" id="prev-pnl" style="color:#00ff88">+$770</div>
+            <div style="font-size:14px;color:#00ff88;font-style:italic;margin-top:4px" id="prev-pct">+7.70%</div>
+          </div>
+          <div class="preview-stats">
+            <div class="preview-stat" id="prev-acc">FTMO Challenge #1 · $10,000</div>
+            <div class="preview-stat" id="prev-wr">Win Rate: <strong>71%</strong></div>
+            <div class="preview-stat" id="prev-rr">Avg R:R: <strong>2.4</strong></div>
+            <div class="preview-stat" id="prev-tr">Trades: <strong>7</strong></div>
+          </div>
+        </div>
+        <div class="preview-bar" id="prev-bar" style="background:linear-gradient(90deg,#1e4d8c,#00ff88);width:77%"></div>
+        <div class="preview-footer">
+          <div>piptrak.com</div>
+          <div>Track your challenge free →</div>
+        </div>
+      </div>
+
+      <button class="btn bp" id="download-btn" onclick="downloadCard()">⬇ Download PNG</button>
+      <div class="share-row">
+        <button class="btn bg" onclick="shareTwitter()">Share on X / Twitter</button>
+        <button class="btn bg" onclick="copyImageLink()">Copy image link</button>
+      </div>
+      <div style="font-size:11px;color:#334;text-align:center;margin-top:12px;font-style:italic">
+        Tip: Download → post to Twitter with caption.<br/>Tag @Piptrak for a retweet 🚀
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  let currentTheme = "dark";
+
+  const THEMES = {
+    dark:  { bg: "linear-gradient(135deg,#090c12,#0f1520)", text: "#c8d8f0", border: "1px solid #1e2a40" },
+    navy:  { bg: "linear-gradient(135deg,#0d2a50,#1e4d8c)", text: "#e0eaff", border: "none" },
+    green: { bg: "linear-gradient(135deg,#0a1a10,#0d2a1a)", text: "#c8d8f0", border: "1px solid #00ff8822" },
+    red:   { bg: "linear-gradient(135deg,#1a0a0d,#2a0d14)", text: "#c8d8f0", border: "1px solid #ff3b5c22" },
+  };
+
+  function setTheme(theme, el) {
+    currentTheme = theme;
+    document.querySelectorAll(".theme-btn").forEach(b => b.classList.remove("active"));
+    el.classList.add("active");
+    updateCard();
+  }
+
+  function updateCard() {
+    const pnl    = parseFloat(document.getElementById("pnl").value) || 0;
+    const size   = parseFloat(document.getElementById("size").value) || 10000;
+    const wr     = document.getElementById("winrate").value;
+    const rr     = document.getElementById("rr").value;
+    const trades = document.getElementById("trades").value;
+    const name   = document.getElementById("acc-name").value;
+    const status = document.getElementById("status").value;
+    const pct    = ((pnl / size) * 100).toFixed(2);
+    const positive = pnl >= 0;
+    const color  = currentTheme === "red" ? "#ff3b5c" : positive ? "#00ff88" : "#ff3b5c";
+
+    const card = document.getElementById("card-preview");
+    const t = THEMES[currentTheme];
+    card.style.background = t.bg;
+    card.style.color = t.text;
+    card.style.border = t.border;
+
+    document.getElementById("prev-pnl").textContent = (positive ? "+" : "") + "$" + Math.abs(pnl).toFixed(0);
+    document.getElementById("prev-pnl").style.color = color;
+    document.getElementById("prev-pct").textContent = (positive ? "+" : "") + pct + "%";
+    document.getElementById("prev-pct").style.color = color;
+    document.getElementById("prev-acc").textContent = name + " · $" + parseInt(size).toLocaleString();
+    document.getElementById("prev-wr").innerHTML = "Win Rate: <strong>" + wr + "%</strong>";
+    document.getElementById("prev-rr").innerHTML = "Avg R:R: <strong>" + rr + "</strong>";
+    document.getElementById("prev-tr").innerHTML = "Trades: <strong>" + trades + "</strong>";
+    document.getElementById("prev-bar").style.background = "linear-gradient(90deg,#1e4d8c," + color + ")";
+    document.getElementById("prev-bar").style.width = Math.min(100, Math.abs(pct)) + "%";
+
+    const statusEl = document.getElementById("prev-status");
+    const statusMap = { progress: ["IN PROGRESS", "#f0c040", "#f0c04018"], passed: ["PASSED ✓", "#00ff88", "#00ff8818"], funded: ["NOW FUNDED 🎉", "#c8a0ff", "#c8a0ff18"] };
+    const [stText, stColor, stBg] = statusMap[status];
+    statusEl.textContent = stText;
+    statusEl.style.color = stColor;
+    statusEl.style.background = stBg;
+  }
+
+  function downloadCard() {
+    // In production, use html2canvas or a server-side screenshot service
+    // For now, show instructions
+    alert("To download:\n1. Right-click the card preview\n2. Select 'Save image as'\n\nOr integrate html2canvas for automatic PNG export.");
+  }
+
+  function shareTwitter() {
+    const pnl = document.getElementById("pnl").value;
+    const size = document.getElementById("size").value;
+    const name = document.getElementById("acc-name").value;
+    const pct = ((parseFloat(pnl) / parseFloat(size)) * 100).toFixed(1);
+    const text = encodeURIComponent(`${parseFloat(pnl) >= 0 ? "📈" : "📉"} ${name} update:\n\nP&L: ${parseFloat(pnl) >= 0 ? "+" : ""}$${parseFloat(pnl).toFixed(0)} (${parseFloat(pnl) >= 0 ? "+" : ""}${pct}%)\n\nTracking every pip with @Piptrak 👇\nhttps://piptrak.com`);
+    window.open("https://twitter.com/intent/tweet?text=" + text, "_blank");
+  }
+
+  function copyImageLink() {
+    navigator.clipboard.writeText("https://app.piptrak.com/share/card?ref=demo");
+    alert("Link copied! (In production this generates a real shareable URL)");
+  }
+
+  updateCard();
+</script>
+</body>
+</html>

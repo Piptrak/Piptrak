@@ -1,0 +1,852 @@
+import { useState, useEffect, useRef } from "react";
+
+// ── Constants ─────────────────────────────────────────────────────────────────
+const FIRMS = {
+  FTMO: { target: 10, dailyLoss: 5, maxDrawdown: 10, days: 30 },
+  "Funded Next": { target: 8, dailyLoss: 5, maxDrawdown: 10, days: 30 },
+  "The5ers": { target: 6, dailyLoss: 4, maxDrawdown: 8, days: 60 },
+  "MyFundedFX": { target: 10, dailyLoss: 5, maxDrawdown: 10, days: 30 },
+  Custom: { target: 10, dailyLoss: 5, maxDrawdown: 10, days: 30 },
+};
+const PIP_VALUES = {
+  "EUR/USD": 10, "GBP/USD": 10, "USD/JPY": 9.1,
+  "AUD/USD": 10, "XAU/USD": 10, "US30": 1, "NAS100": 1,
+};
+const PLANS = {
+  free:  { name: "Free",    price: 0,   accounts: 1, analytics: false, alerts: false, broker: false },
+  pro:   { name: "Pro",     price: 15,  accounts: 5, analytics: true,  alerts: true,  broker: true  },
+  elite: { name: "Elite",   price: 39,  accounts: 999,analytics: true, alerts: true,  broker: true  },
+};
+const DEMO_TRADES = [
+  { id: 1, pair: "EUR/USD", type: "BUY",  lots: 0.5, entry: 1.0850, exit: 1.0920, pnl: 350,  date: "2025-04-22", notes: "Bullish momentum", source: "manual" },
+  { id: 2, pair: "GBP/USD", type: "SELL", lots: 0.3, entry: 1.2700, exit: 1.2640, pnl: 180,  date: "2025-04-23", notes: "Resistance rejection", source: "manual" },
+  { id: 3, pair: "USD/JPY", type: "BUY",  lots: 0.4, entry: 149.50, exit: 149.20, pnl: -120, date: "2025-04-24", notes: "Stopped out", source: "manual" },
+  { id: 4, pair: "EUR/USD", type: "SELL", lots: 0.6, entry: 1.0930, exit: 1.0870, pnl: 360,  date: "2025-04-25", notes: "Bearish engulfing", source: "manual" },
+  { id: 5, pair: "XAU/USD", type: "BUY",  lots: 0.2, entry: 2341,  exit: 2368,   pnl: 540,  date: "2025-04-26", notes: "Gold breakout", source: "csv" },
+  { id: 6, pair: "GBP/USD", type: "BUY",  lots: 0.3, entry: 1.2650, exit: 1.2620, pnl: -90, date: "2025-04-27", notes: "News spike", source: "manual" },
+  { id: 7, pair: "EUR/USD", type: "BUY",  lots: 0.5, entry: 1.0820, exit: 1.0890, pnl: 350, date: "2025-04-28", notes: "ICT setup", source: "metaapi" },
+];
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+const today = () => new Date().toISOString().split("T")[0];
+const fmtUSD = n => `${n >= 0 ? "+" : ""}$${Math.abs(n).toFixed(0)}`;
+const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
+
+function useLocalStorage(key, initial) {
+  const [val, setVal] = useState(() => {
+    try { const s = localStorage.getItem(key); return s ? JSON.parse(s) : initial; } catch { return initial; }
+  });
+  const set = v => { setVal(v); try { localStorage.setItem(key, JSON.stringify(v)); } catch {} };
+  return [val, set];
+}
+
+// ── Micro Components ──────────────────────────────────────────────────────────
+const SourceBadge = ({ source }) => {
+  const m = { csv: ["CSV","#f0c040","#2a200a"], metaapi: ["MT4/5","#c8a0ff","#1a0a2a"], webhook: ["HOOK","#4db8ff","#0a1a2a"], manual: ["MAN","#556","#1a1a1a"] };
+  const [l,c,bg] = m[source] || m.manual;
+  return <span style={{ fontSize:8, padding:"2px 5px", borderRadius:3, background:bg, color:c, fontWeight:700, letterSpacing:1 }}>{l}</span>;
+};
+
+const Toast = ({ msg, color="#00ff88" }) => (
+  <div style={{ position:"fixed", top:16, left:"50%", transform:"translateX(-50%)", background:"#0d1a12", border:`1px solid ${color}44`, borderRadius:20, padding:"10px 20px", fontSize:13, color, fontStyle:"italic", zIndex:200, whiteSpace:"nowrap", boxShadow:"0 4px 20px #00000088" }}>
+    {msg}
+  </div>
+);
+
+const ProgressBar = ({ pct, gradient, height=5 }) => (
+  <div style={{ height, background:"#1e2a40", borderRadius:3, overflow:"hidden", marginTop:7 }}>
+    <div style={{ height:"100%", width:`${clamp(pct,0,100)}%`, background:gradient, borderRadius:3, transition:"width 0.6s" }} />
+  </div>
+);
+
+// ── Equity Curve ──────────────────────────────────────────────────────────────
+function EquityCurve({ trades, accountSize, targetProfit, maxDrawdownLimit }) {
+  const W=340, H=160, P={t:16,r:52,b:28,l:52};
+  const iW=W-P.l-P.r, iH=H-P.t-P.b;
+  const sorted=[...trades].sort((a,b)=>a.date.localeCompare(b.date));
+  const pts=[{i:0,bal:accountSize}]; let run=accountSize;
+  sorted.forEach((t,i)=>{run+=t.pnl; pts.push({i:i+1,bal:run});});
+  const bals=pts.map(p=>p.bal);
+  const minB=Math.min(...bals, accountSize-maxDrawdownLimit)*0.997;
+  const maxB=Math.max(...bals, accountSize+targetProfit)*1.003;
+  const range=maxB-minB||1; const n=pts.length-1||1;
+  const tx=i=>P.l+(i/n)*iW, ty=b=>P.t+iH-((b-minB)/range)*iH;
+  const line=pts.map((p,i)=>`${i===0?"M":"L"}${tx(p.i).toFixed(1)},${ty(p.bal).toFixed(1)}`).join(" ");
+  const area=line+` L${tx(n)},${P.t+iH} L${tx(0)},${P.t+iH} Z`;
+  return (
+    <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{display:"block"}}>
+      <defs><linearGradient id="ag" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#00ff88" stopOpacity="0.22"/><stop offset="100%" stopColor="#00ff88" stopOpacity="0.01"/></linearGradient></defs>
+      {[0,0.5,1].map((f,i)=>{const y=P.t+iH*f,v=maxB-f*range; return <g key={i}><line x1={P.l} y1={y} x2={W-P.r} y2={y} stroke="#1a2235" strokeWidth="1"/><text x={P.l-4} y={y+3} fill="#445" fontSize="8" textAnchor="end">${Math.round(v/1000)}k</text></g>;})}
+      <line x1={P.l} y1={ty(accountSize+targetProfit)} x2={W-P.r} y2={ty(accountSize+targetProfit)} stroke="#00ff88" strokeWidth="1" strokeDasharray="4 3" opacity="0.6"/>
+      <text x={W-P.r+3} y={ty(accountSize+targetProfit)+3} fill="#00ff88" fontSize="7">TARGET</text>
+      <line x1={P.l} y1={ty(accountSize-maxDrawdownLimit)} x2={W-P.r} y2={ty(accountSize-maxDrawdownLimit)} stroke="#ff3b5c" strokeWidth="1" strokeDasharray="4 3" opacity="0.5"/>
+      <text x={W-P.r+3} y={ty(accountSize-maxDrawdownLimit)+3} fill="#ff3b5c" fontSize="7">MAX DD</text>
+      <line x1={P.l} y1={ty(accountSize)} x2={W-P.r} y2={ty(accountSize)} stroke="#333" strokeWidth="1" strokeDasharray="2 5"/>
+      <path d={area} fill="url(#ag)"/><path d={line} fill="none" stroke="#00ff88" strokeWidth="2" strokeLinejoin="round"/>
+      {pts.map((p,i)=><circle key={i} cx={tx(p.i)} cy={ty(p.bal)} r="3" fill={p.bal>=accountSize?"#00ff88":"#ff3b5c"} stroke="#090c12" strokeWidth="1.5"/>)}
+      {pts.map((p,i)=><text key={i} x={tx(p.i)} y={H-4} fill="#445" fontSize="8" textAnchor="middle">{i===0?"S":`T${i}`}</text>)}
+    </svg>
+  );
+}
+
+// ── Deep Analytics ────────────────────────────────────────────────────────────
+function DeepAnalytics({ trades, accountSize }) {
+  const wins = trades.filter(t=>t.pnl>0), losses = trades.filter(t=>t.pnl<0);
+  const byPair = {};
+  trades.forEach(t=>{ if(!byPair[t.pair]) byPair[t.pair]={pair:t.pair,trades:0,pnl:0,wins:0}; byPair[t.pair].trades++; byPair[t.pair].pnl+=t.pnl; if(t.pnl>0) byPair[t.pair].wins++; });
+  const pairStats = Object.values(byPair).sort((a,b)=>b.pnl-a.pnl);
+  const byDay = {Mon:0,Tue:0,Wed:0,Thu:0,Fri:0};
+  trades.forEach(t=>{ const d=new Date(t.date).toLocaleDateString("en",{weekday:"short"}); if(byDay[d]!==undefined) byDay[d]+=t.pnl; });
+  const byMonth = {};
+  trades.forEach(t=>{ const m=t.date.slice(0,7); if(!byMonth[m]) byMonth[m]=0; byMonth[m]+=t.pnl; });
+  // Streak
+  let streak=0, maxStreak=0, cur=0;
+  [...trades].sort((a,b)=>a.date.localeCompare(b.date)).forEach(t=>{ if(t.pnl>0){cur++;maxStreak=Math.max(maxStreak,cur);}else cur=0; });
+  const lastT=trades[trades.length-1];
+  if(lastT) streak=lastT.pnl>0?cur:0;
+  const maxDD = ()=>{ let peak=accountSize,dd=0,run=accountSize; [...trades].sort((a,b)=>a.date.localeCompare(b.date)).forEach(t=>{run+=t.pnl;if(run>peak)peak=run;dd=Math.max(dd,peak-run);}); return dd; };
+  const profitFactor = losses.length ? wins.reduce((s,t)=>s+t.pnl,0)/Math.abs(losses.reduce((s,t)=>s+t.pnl,0)) : 999;
+
+  return (
+    <div>
+      {/* Key stats */}
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:12}}>
+        {[
+          {l:"Profit Factor",v:profitFactor===999?"∞":profitFactor.toFixed(2),c:"#00ff88",sub:"wins/losses ratio"},
+          {l:"Max Drawdown",v:`$${maxDD().toFixed(0)}`,c:"#ff3b5c",sub:"peak to trough"},
+          {l:"Best Streak",v:`${maxStreak} wins`,c:"#4db8ff",sub:"consecutive wins"},
+          {l:"Avg Trade",v:fmtUSD(trades.length?trades.reduce((s,t)=>s+t.pnl,0)/trades.length:0),c:"#c8a0ff",sub:"per closed trade"},
+        ].map(x=>(
+          <div key={x.l} className="card">
+            <div style={{fontSize:10,color:"#445",letterSpacing:1,textTransform:"uppercase",marginBottom:6}}>{x.l}</div>
+            <div style={{fontSize:20,fontWeight:700,fontStyle:"italic",color:x.c}}>{x.v}</div>
+            <div style={{fontSize:10,color:"#556",marginTop:3}}>{x.sub}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* P&L by day of week */}
+      <div className="card" style={{marginBottom:12}}>
+        <div style={{fontSize:11,color:"#445",letterSpacing:2,textTransform:"uppercase",marginBottom:12,fontStyle:"italic"}}>P&L by Day of Week</div>
+        <div style={{display:"flex",alignItems:"flex-end",gap:8,height:80}}>
+          {Object.entries(byDay).map(([day,pnl])=>{
+            const maxA=Math.max(...Object.values(byDay).map(Math.abs),1);
+            const h=clamp((Math.abs(pnl)/maxA)*64,4,64);
+            return (
+              <div key={day} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:4}}>
+                <div style={{fontSize:10,fontStyle:"italic",color:pnl>=0?"#00ff88":"#ff3b5c"}}>{fmtUSD(pnl)}</div>
+                <div style={{height:h,width:"100%",background:pnl>=0?"#00ff88":"#ff3b5c",borderRadius:"3px 3px 0 0",opacity:0.8}}/>
+                <div style={{fontSize:10,color:"#445"}}>{day}</div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Best pairs */}
+      <div className="card" style={{marginBottom:12}}>
+        <div style={{fontSize:11,color:"#445",letterSpacing:2,textTransform:"uppercase",marginBottom:12,fontStyle:"italic"}}>Performance by Pair</div>
+        {pairStats.map(p=>(
+          <div key={p.pair} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 0",borderBottom:"1px solid #1a2235"}}>
+            <div>
+              <div style={{fontSize:13,color:"#e0eaff",fontWeight:700}}>{p.pair}</div>
+              <div style={{fontSize:10,color:"#445"}}>{p.trades} trades · {Math.round((p.wins/p.trades)*100)}% win</div>
+            </div>
+            <div style={{fontSize:15,fontWeight:700,fontStyle:"italic",color:p.pnl>=0?"#00ff88":"#ff3b5c"}}>{fmtUSD(p.pnl)}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Monthly P&L */}
+      {Object.keys(byMonth).length > 0 && (
+        <div className="card">
+          <div style={{fontSize:11,color:"#445",letterSpacing:2,textTransform:"uppercase",marginBottom:12,fontStyle:"italic"}}>Monthly P&L</div>
+          {Object.entries(byMonth).map(([m,pnl])=>(
+            <div key={m} style={{marginBottom:10}}>
+              <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
+                <span style={{fontSize:12,color:"#aab",fontStyle:"italic"}}>{m}</span>
+                <span style={{fontSize:13,fontWeight:700,fontStyle:"italic",color:pnl>=0?"#00ff88":"#ff3b5c"}}>{fmtUSD(pnl)}</span>
+              </div>
+              <ProgressBar pct={clamp((pnl/500)*100,0,100)} gradient={pnl>=0?"linear-gradient(90deg,#1e4d8c,#00ff88)":"linear-gradient(90deg,#8c1e2a,#ff3b5c)"}/>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Notifications Panel ───────────────────────────────────────────────────────
+function NotificationsPanel({ trades, rules, accountSize }) {
+  const [prefs, setPrefs] = useLocalStorage("pip_notif", {
+    dailyLoss: true, maxDD: true, targetHit: true, streak: true, sms: false, push: true, email: false, phone: ""
+  });
+  const todayPnl = trades.filter(t=>t.date===today()).reduce((s,t)=>s+t.pnl,0);
+  const totalPnl = trades.reduce((s,t)=>s+t.pnl,0);
+  const dailyLossLimit=(rules.dailyLoss/100)*accountSize;
+  const maxDrawdownLimit=(rules.maxDrawdown/100)*accountSize;
+  const targetProfit=(rules.target/100)*accountSize;
+  const dailyPct=clamp((Math.abs(Math.min(0,todayPnl))/dailyLossLimit)*100,0,100);
+  const alerts = [
+    { id:"dailyLoss", label:"Daily Loss Warning", desc:"Alert at 70% & 90% of daily loss limit", active:dailyPct>70, value:`${dailyPct.toFixed(0)}% used` },
+    { id:"maxDD",     label:"Max Drawdown Alert",  desc:"Alert when approaching max drawdown",   active:totalPnl<-maxDrawdownLimit*0.8, value:`$${Math.abs(Math.min(0,totalPnl)).toFixed(0)} drawn` },
+    { id:"targetHit", label:"Target Reached",      desc:"Notify when profit target is hit",      active:totalPnl>=targetProfit, value:`${((totalPnl/targetProfit)*100).toFixed(0)}% to goal` },
+    { id:"streak",    label:"Win Streak Alert",    desc:"Celebrate consecutive winning trades",  active:false, value:"Track streaks" },
+  ];
+
+  return (
+    <div>
+      {/* Live alert status */}
+      <div className="card" style={{marginBottom:12}}>
+        <div style={{fontSize:11,color:"#445",letterSpacing:2,textTransform:"uppercase",marginBottom:12,fontStyle:"italic"}}>Live Alert Status</div>
+        {alerts.map(a=>(
+          <div key={a.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:"1px solid #1a2235"}}>
+            <div style={{display:"flex",alignItems:"center",gap:10}}>
+              <div style={{width:8,height:8,borderRadius:"50%",background:a.active?"#ff3b5c":"#1e4d8c",boxShadow:a.active?"0 0 8px #ff3b5c":"none"}}/>
+              <div>
+                <div style={{fontSize:13,color:"#e0eaff"}}>{a.label}</div>
+                <div style={{fontSize:10,color:"#445",fontStyle:"italic"}}>{a.desc}</div>
+              </div>
+            </div>
+            <div style={{textAlign:"right"}}>
+              <div style={{fontSize:10,color:a.active?"#ff3b5c":"#445",fontStyle:"italic"}}>{a.active?"⚠ ACTIVE":"OK"}</div>
+              <div style={{fontSize:10,color:"#445"}}>{a.value}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Alert toggles */}
+      <div className="card" style={{marginBottom:12}}>
+        <div style={{fontSize:11,color:"#445",letterSpacing:2,textTransform:"uppercase",marginBottom:12,fontStyle:"italic"}}>Alert Preferences</div>
+        {[
+          {k:"dailyLoss",l:"Daily Loss Warnings"},
+          {k:"maxDD",l:"Max Drawdown Alerts"},
+          {k:"targetHit",l:"Target Reached"},
+          {k:"streak",l:"Win Streak Celebration"},
+        ].map(x=>(
+          <div key={x.k} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:"1px solid #1a2235"}}>
+            <span style={{fontSize:13,color:"#aab",fontStyle:"italic"}}>{x.l}</span>
+            <div onClick={()=>setPrefs({...prefs,[x.k]:!prefs[x.k]})}
+              style={{width:42,height:24,borderRadius:12,background:prefs[x.k]?"#1e4d8c":"#1e2a40",cursor:"pointer",position:"relative",transition:"background 0.2s"}}>
+              <div style={{position:"absolute",top:3,left:prefs[x.k]?20:3,width:18,height:18,borderRadius:"50%",background:prefs[x.k]?"#4db8ff":"#445",transition:"left 0.2s"}}/>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Delivery channels */}
+      <div className="card">
+        <div style={{fontSize:11,color:"#445",letterSpacing:2,textTransform:"uppercase",marginBottom:12,fontStyle:"italic"}}>Delivery Channels</div>
+        {[{k:"push",l:"Push Notifications",s:"In-app & browser alerts"},{k:"email",l:"Email Alerts",s:"Sent to account email"},{k:"sms",l:"SMS Alerts",s:"Requires Pro plan"}].map(x=>(
+          <div key={x.k} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:"1px solid #1a2235"}}>
+            <div>
+              <div style={{fontSize:13,color:"#aab",fontStyle:"italic"}}>{x.l}</div>
+              <div style={{fontSize:10,color:"#445"}}>{x.s}</div>
+            </div>
+            <div onClick={()=>setPrefs({...prefs,[x.k]:!prefs[x.k]})}
+              style={{width:42,height:24,borderRadius:12,background:prefs[x.k]?"#1e4d8c":"#1e2a40",cursor:"pointer",position:"relative",transition:"background 0.2s"}}>
+              <div style={{position:"absolute",top:3,left:prefs[x.k]?20:3,width:18,height:18,borderRadius:"50%",background:prefs[x.k]?"#4db8ff":"#445",transition:"left 0.2s"}}/>
+            </div>
+          </div>
+        ))}
+        {prefs.sms && (
+          <div style={{marginTop:12}}>
+            <div style={{fontSize:11,color:"#778",marginBottom:5}}>Phone Number</div>
+            <input className="inf" placeholder="+1 555 000 0000" value={prefs.phone} onChange={e=>setPrefs({...prefs,phone:e.target.value})}/>
+            <button className="btn bp" style={{width:"100%",marginTop:10,padding:"9px"}}>Save & Verify</button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Pricing / Stripe ──────────────────────────────────────────────────────────
+function PricingPanel({ currentPlan, onUpgrade }) {
+  const [billing, setBilling] = useState("monthly");
+  const disc = billing==="annual" ? 0.75 : 1;
+  return (
+    <div>
+      {/* Billing toggle */}
+      <div style={{display:"flex",justifyContent:"center",gap:0,marginBottom:20,background:"#0f1520",borderRadius:10,padding:4,border:"1px solid #1e2a40"}}>
+        {["monthly","annual"].map(b=>(
+          <div key={b} onClick={()=>setBilling(b)} style={{flex:1,textAlign:"center",padding:"8px",borderRadius:8,background:billing===b?"#1e4d8c":"transparent",cursor:"pointer",fontSize:12,color:billing===b?"#c8d8f0":"#556",fontStyle:"italic",transition:"all 0.2s"}}>
+            {b==="annual"?"Annual (25% off)":"Monthly"}
+          </div>
+        ))}
+      </div>
+
+      {/* Plan cards */}
+      {Object.entries(PLANS).map(([key, plan])=>{
+        const isActive = currentPlan===key;
+        const price = Math.round(plan.price*disc);
+        return (
+          <div key={key} style={{background:isActive?"#0f1c30":key==="pro"?"#0f1520":"#0a0e18",border:`1px solid ${isActive?"#1e4d8c":key==="pro"?"#1e4d8c44":"#1e2a40"}`,borderRadius:12,padding:"18px 16px",marginBottom:12,position:"relative"}}>
+            {key==="pro" && <div style={{position:"absolute",top:-10,left:"50%",transform:"translateX(-50%)",background:"#1e4d8c",color:"#c8d8f0",fontSize:10,padding:"3px 12px",borderRadius:20,letterSpacing:2,fontStyle:"italic"}}>MOST POPULAR</div>}
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:12}}>
+              <div>
+                <div style={{fontSize:18,fontWeight:700,fontStyle:"italic",color:"#e0eaff"}}>{plan.name}</div>
+                <div style={{fontSize:11,color:"#445",marginTop:2}}>{key==="free"?"Forever free":billing==="annual"?"Billed annually":"Billed monthly"}</div>
+              </div>
+              <div style={{textAlign:"right"}}>
+                <div style={{fontSize:28,fontWeight:700,fontStyle:"italic",color:"#e0eaff"}}>${price}<span style={{fontSize:13,color:"#445",fontStyle:"normal"}}>/mo</span></div>
+              </div>
+            </div>
+            {[
+              `${plan.accounts===999?"Unlimited":plan.accounts} challenge account${plan.accounts>1?"s":""}`,
+              plan.analytics?"Deep analytics & insights":"Basic stats only",
+              plan.alerts?"Real-time breach alerts":"No alerts",
+              plan.broker?"Broker CSV + API sync":"Manual entry only",
+              key==="elite"?"White-label reports":"",
+              key==="elite"?"Priority support":"",
+            ].filter(Boolean).map((f,i)=>(
+              <div key={i} style={{display:"flex",alignItems:"center",gap:8,padding:"5px 0",fontSize:12,color:"#aab"}}>
+                <span style={{color:plan.price===0&&i>2?"#445":"#00ff88",fontSize:14}}>{plan.price===0&&i>2?"✗":"✓"}</span>
+                <span style={{fontStyle:"italic"}}>{f}</span>
+              </div>
+            ))}
+            <button onClick={()=>onUpgrade(key)} className="btn" style={{width:"100%",marginTop:14,padding:"11px",background:isActive?"#1a2235":key==="pro"?"#1e4d8c":"#0f1520",color:isActive?"#445":key==="pro"?"#c8d8f0":"#778",border:isActive?"none":`1px solid ${key==="pro"?"transparent":"#1e2a40"}`,fontSize:13}}>
+              {isActive?"Current Plan":key==="free"?"Downgrade to Free":"Upgrade — Pay with Stripe"}
+            </button>
+          </div>
+        );
+      })}
+
+      <div style={{fontSize:11,color:"#445",textAlign:"center",fontStyle:"italic",marginTop:8}}>
+        🔒 Secured by Stripe · Cancel anytime · No hidden fees
+      </div>
+    </div>
+  );
+}
+
+// ── Onboarding ────────────────────────────────────────────────────────────────
+function Onboarding({ onComplete }) {
+  const [step, setStep] = useState(0);
+  const [data, setData] = useState({ firm:"FTMO", size:10000, name:"", startDate: today() });
+  const steps = [
+    {
+      title: "Welcome to Piptrak",
+      sub: "The smarter way to pass your prop firm challenge",
+      content: (
+        <div style={{textAlign:"center"}}>
+          <div style={{fontSize:56,marginBottom:16}}>⬡</div>
+          <div style={{fontSize:14,color:"#778",fontStyle:"italic",lineHeight:1.7}}>
+            Track your trades, monitor challenge rules, and get real-time alerts — all in one place.
+          </div>
+          <div style={{display:"flex",flexDirection:"column",gap:10,marginTop:24}}>
+            {["📊 Real-time challenge progress","⚠️ Breach alerts before it's too late","📈 Deep trade analytics","🔗 Import from any broker"].map((f,i)=>(
+              <div key={i} style={{background:"#0f1520",border:"1px solid #1e2a40",borderRadius:8,padding:"10px 14px",fontSize:13,color:"#aab",fontStyle:"italic"}}>{f}</div>
+            ))}
+          </div>
+        </div>
+      )
+    },
+    {
+      title: "Your Prop Firm",
+      sub: "Tell us which firm you're challenging",
+      content: (
+        <div>
+          <div style={{fontSize:11,color:"#778",marginBottom:8}}>Select your firm</div>
+          <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:16}}>
+            {Object.keys(FIRMS).map(f=>(
+              <div key={f} onClick={()=>setData({...data,firm:f})}
+                style={{background:data.firm===f?"#0f1c30":"#0f1520",border:`1px solid ${data.firm===f?"#1e4d8c":"#1e2a40"}`,borderRadius:10,padding:"12px 16px",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                <span style={{fontSize:14,fontWeight:700,fontStyle:"italic",color:"#e0eaff"}}>{f}</span>
+                {data.firm===f && <span style={{color:"#4db8ff",fontSize:16}}>✓</span>}
+              </div>
+            ))}
+          </div>
+          <div style={{fontSize:11,color:"#778",marginBottom:6}}>Account Size ($)</div>
+          <input className="inf" type="number" value={data.size} onChange={e=>setData({...data,size:+e.target.value})} style={{marginBottom:12}}/>
+          <div style={{fontSize:11,color:"#778",marginBottom:6}}>Challenge Start Date</div>
+          <input className="inf" type="date" value={data.startDate} onChange={e=>setData({...data,startDate:e.target.value})}/>
+        </div>
+      )
+    },
+    {
+      title: "Name Your Account",
+      sub: "Give it a nickname you'll recognise",
+      content: (
+        <div>
+          <div style={{fontSize:11,color:"#778",marginBottom:6}}>Account Nickname</div>
+          <input className="inf" placeholder={`${data.firm} Challenge #1`} value={data.name} onChange={e=>setData({...data,name:e.target.value})} style={{marginBottom:20}}/>
+          <div style={{background:"#0a0f1a",borderRadius:10,border:"1px solid #1e2a40",padding:"14px"}}>
+            <div style={{fontSize:11,color:"#445",letterSpacing:2,textTransform:"uppercase",marginBottom:10,fontStyle:"italic"}}>Your Challenge Summary</div>
+            {[
+              {l:"Firm",v:data.firm},
+              {l:"Account Size",v:`$${(+data.size).toLocaleString()}`},
+              {l:"Profit Target",v:`${FIRMS[data.firm].target}% ($${Math.round((FIRMS[data.firm].target/100)*(+data.size)).toLocaleString()})`},
+              {l:"Daily Loss Limit",v:`${FIRMS[data.firm].dailyLoss}% ($${Math.round((FIRMS[data.firm].dailyLoss/100)*(+data.size)).toLocaleString()})`},
+              {l:"Max Drawdown",v:`${FIRMS[data.firm].maxDrawdown}% ($${Math.round((FIRMS[data.firm].maxDrawdown/100)*(+data.size)).toLocaleString()})`},
+              {l:"Challenge Days",v:`${FIRMS[data.firm].days} days`},
+            ].map((x,i,arr)=>(
+              <div key={x.l} style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderBottom:i<arr.length-1?"1px solid #1a2235":"none",fontSize:12}}>
+                <span style={{color:"#778",fontStyle:"italic"}}>{x.l}</span>
+                <span style={{color:"#c8d8f0",fontWeight:700}}>{x.v}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )
+    },
+    {
+      title: "Choose Your Plan",
+      sub: "Start free, upgrade anytime",
+      content: (
+        <div>
+          {Object.entries(PLANS).slice(0,2).map(([key,plan])=>(
+            <div key={key} onClick={()=>onComplete(data,key)}
+              style={{background:"#0f1520",border:`1px solid ${key==="pro"?"#1e4d8c":"#1e2a40"}`,borderRadius:12,padding:"16px",marginBottom:12,cursor:"pointer",position:"relative"}}>
+              {key==="pro"&&<div style={{position:"absolute",top:-10,left:"50%",transform:"translateX(-50%)",background:"#1e4d8c",color:"#c8d8f0",fontSize:10,padding:"3px 12px",borderRadius:20,letterSpacing:2}}>RECOMMENDED</div>}
+              <div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}>
+                <div style={{fontSize:16,fontWeight:700,fontStyle:"italic",color:"#e0eaff"}}>{plan.name}</div>
+                <div style={{fontSize:20,fontWeight:700,fontStyle:"italic",color:"#e0eaff"}}>{plan.price===0?"Free":`$${plan.price}/mo`}</div>
+              </div>
+              <div style={{fontSize:12,color:"#778",fontStyle:"italic"}}>{plan.price===0?"1 account · Basic stats · Manual only":"5 accounts · Deep analytics · Broker sync · Alerts"}</div>
+              <div style={{marginTop:10,background:key==="pro"?"#1e4d8c":"#1a2235",borderRadius:6,padding:"9px",textAlign:"center",fontSize:13,color:"#c8d8f0",fontStyle:"italic"}}>
+                {key==="pro"?"Start Pro — 7 days free ✓":"Continue with Free"}
+              </div>
+            </div>
+          ))}
+        </div>
+      )
+    }
+  ];
+  const s = steps[step];
+  return (
+    <div style={{fontFamily:"'Times New Roman',Times,serif",background:"#090c12",minHeight:"100vh",color:"#c8d8f0",maxWidth:480,margin:"0 auto",padding:"24px 16px 100px"}}>
+      <style>{`*{box-sizing:border-box;margin:0;padding:0} .inf{background:#0a0f1a;border:1px solid #1e2a40;border-radius:8px;padding:10px 12px;color:#c8d8f0;font-family:'Times New Roman',Times,serif;font-size:14px;width:100%;outline:none;} .inf:focus{border-color:#3a5080} .card{background:#0f1520;border:1px solid #1e2a40;border-radius:10px;padding:14px} .btn{padding:11px 18px;border-radius:8px;font-family:'Times New Roman',Times,serif;font-size:13px;cursor:pointer;border:none;font-style:italic} .bp{background:#1e4d8c;color:#c8d8f0}`}</style>
+      {/* Progress dots */}
+      <div style={{display:"flex",justifyContent:"center",gap:8,marginBottom:28}}>
+        {steps.map((_,i)=><div key={i} style={{width:i===step?24:8,height:8,borderRadius:4,background:i<=step?"#1e4d8c":"#1e2a40",transition:"all 0.3s"}}/>)}
+      </div>
+      <div style={{fontSize:22,fontWeight:700,fontStyle:"italic",color:"#e0eaff",marginBottom:6}}>{s.title}</div>
+      <div style={{fontSize:13,color:"#556",fontStyle:"italic",marginBottom:24}}>{s.sub}</div>
+      {s.content}
+      <div style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:480,background:"#090c12",borderTop:"1px solid #1a2235",padding:"12px 16px",display:"flex",gap:10}}>
+        {step>0&&<button className="btn" onClick={()=>setStep(step-1)} style={{background:"transparent",border:"1px solid #1e2a40",color:"#778",padding:"11px 18px"}}>Back</button>}
+        {step<steps.length-1&&<button className="btn bp" onClick={()=>setStep(step+1)} style={{flex:1}}>Continue →</button>}
+      </div>
+    </div>
+  );
+}
+
+// ── Auth Screen ───────────────────────────────────────────────────────────────
+function AuthScreen({ onAuth }) {
+  const [mode, setMode] = useState("login");
+  const [email, setEmail] = useState("");
+  const [pass, setPass] = useState("");
+  const [name, setName] = useState("");
+  const [err, setErr] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const submit = async () => {
+    if(!email||!pass){setErr("Please fill all fields");return;}
+    setLoading(true); setErr("");
+    await new Promise(r=>setTimeout(r,1000));
+    // Simulate Supabase auth
+    const user = { id: "usr_"+Date.now(), email, name: name||email.split("@")[0], plan:"free", createdAt: today() };
+    setLoading(false);
+    onAuth(user);
+  };
+
+  return (
+    <div style={{fontFamily:"'Times New Roman',Times,serif",background:"#090c12",minHeight:"100vh",color:"#c8d8f0",maxWidth:480,margin:"0 auto",padding:"48px 24px"}}>
+      <style>{`*{box-sizing:border-box;margin:0;padding:0} .inf{background:#0a0f1a;border:1px solid #1e2a40;border-radius:8px;padding:12px 14px;color:#c8d8f0;font-family:'Times New Roman',Times,serif;font-size:15px;width:100%;outline:none;margin-bottom:12px} .inf:focus{border-color:#3a5080} .btn{padding:13px;border-radius:8px;font-family:'Times New Roman',Times,serif;font-size:15px;cursor:pointer;border:none;font-style:italic;width:100%} .bp{background:#1e4d8c;color:#c8d8f0}`}</style>
+      <div style={{textAlign:"center",marginBottom:36}}>
+        <div style={{width:48,height:48,background:"linear-gradient(135deg,#1e4d8c,#0d2a50)",borderRadius:12,display:"inline-flex",alignItems:"center",justifyContent:"center",fontSize:22,marginBottom:14}}>⬡</div>
+        <div style={{fontSize:26,fontWeight:700,fontStyle:"italic",color:"#e0eaff"}}>Piptrak</div>
+        <div style={{fontSize:12,color:"#445",letterSpacing:3,marginTop:4}}>TRADE & CHALLENGE TRACKER</div>
+      </div>
+      <div style={{display:"flex",background:"#0f1520",borderRadius:10,padding:4,marginBottom:24,border:"1px solid #1e2a40"}}>
+        {["login","signup"].map(m=>(
+          <div key={m} onClick={()=>setMode(m)} style={{flex:1,textAlign:"center",padding:"9px",borderRadius:8,background:mode===m?"#1e4d8c":"transparent",cursor:"pointer",fontSize:13,color:mode===m?"#c8d8f0":"#556",fontStyle:"italic",transition:"all 0.2s"}}>
+            {m==="login"?"Sign In":"Create Account"}
+          </div>
+        ))}
+      </div>
+      {mode==="signup"&&<input className="inf" placeholder="Full Name" value={name} onChange={e=>setName(e.target.value)}/>}
+      <input className="inf" type="email" placeholder="Email address" value={email} onChange={e=>setEmail(e.target.value)}/>
+      <input className="inf" type="password" placeholder="Password" value={pass} onChange={e=>setPass(e.target.value)}/>
+      {err&&<div style={{fontSize:12,color:"#ff3b5c",fontStyle:"italic",marginBottom:12}}>⚠ {err}</div>}
+      <button className="btn bp" onClick={submit} disabled={loading}>{loading?"Connecting to Supabase...":mode==="login"?"Sign In":"Create Account"}</button>
+      <div style={{textAlign:"center",marginTop:16,fontSize:12,color:"#445",fontStyle:"italic"}}>
+        {mode==="login"?"Don't have an account? ":"Already have one? "}
+        <span onClick={()=>setMode(mode==="login"?"signup":"login")} style={{color:"#4db8ff",cursor:"pointer"}}>{mode==="login"?"Sign up free":"Sign in"}</span>
+      </div>
+      <div style={{marginTop:24,padding:"14px",background:"#0f1520",borderRadius:10,border:"1px solid #1e2a40",textAlign:"center"}}>
+        <div style={{fontSize:11,color:"#445",letterSpacing:2,textTransform:"uppercase",marginBottom:8}}>Powered by</div>
+        <div style={{display:"flex",justifyContent:"center",gap:20,fontSize:12,color:"#778",fontStyle:"italic"}}>
+          <span>🔐 Supabase Auth</span><span>💾 Postgres DB</span><span>💳 Stripe</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Main App ──────────────────────────────────────────────────────────────────
+export default function Piptrak() {
+  const [user, setUser] = useLocalStorage("pip_user", null);
+  const [onboarded, setOnboarded] = useLocalStorage("pip_onboarded", false);
+  const [accounts, setAccounts] = useLocalStorage("pip_accounts", []);
+  const [activeId, setActiveId] = useLocalStorage("pip_activeId", null);
+  const [tab, setTab] = useState("dash");
+  const [toast, setToast] = useState(null);
+  const [showAddTrade, setShowAddTrade] = useState(false);
+  const [showAddAcc, setShowAddAcc] = useState(false);
+  const [journal, setJournal] = useLocalStorage("pip_journal", "");
+  const [mood, setMood] = useState("focused");
+  const todayStr = today();
+  const [newTrade, setNewTrade] = useState({pair:"EUR/USD",type:"BUY",lots:"",entry:"",exit:"",pnl:"",date:todayStr,notes:""});
+  const [newAcc, setNewAcc] = useState({name:"",firm:"FTMO",accountSize:10000,startDate:todayStr});
+  const fileRef = useRef();
+
+  const showToast = (msg, color="#00ff88") => { setToast({msg,color}); setTimeout(()=>setToast(null),3000); };
+
+  // Auth flow
+  if (!user) return <AuthScreen onAuth={u=>{ setUser(u); }} />;
+
+  // Onboarding flow
+  if (!onboarded || accounts.length===0) return (
+    <Onboarding onComplete={(data, plan) => {
+      const acc = { id: Date.now(), name: data.name||`${data.firm} #1`, firm: data.firm, accountSize: data.size, startDate: data.startDate, status:"active", trades: DEMO_TRADES };
+      const updUser = {...user, plan};
+      setUser(updUser);
+      setAccounts([acc]);
+      setActiveId(acc.id);
+      setOnboarded(true);
+    }}/>
+  );
+
+  const acc = accounts.find(a=>a.id===activeId) || accounts[0];
+  if(!acc) return null;
+  const rules = FIRMS[acc.firm];
+  const trades = acc.trades;
+  const plan = PLANS[user.plan||"free"];
+
+  // Stats
+  const totalPnl = trades.reduce((s,t)=>s+t.pnl,0);
+  const profitPct = (totalPnl/acc.accountSize)*100;
+  const wins = trades.filter(t=>t.pnl>0);
+  const losses = trades.filter(t=>t.pnl<0);
+  const winRate = trades.length?Math.round((wins.length/trades.length)*100):0;
+  const avgWin = wins.length?wins.reduce((s,t)=>s+t.pnl,0)/wins.length:0;
+  const avgLoss = losses.length?Math.abs(losses.reduce((s,t)=>s+t.pnl,0)/losses.length):0;
+  const rr = avgLoss>0?(avgWin/avgLoss).toFixed(2):"N/A";
+  const todayPnl = trades.filter(t=>t.date===todayStr).reduce((s,t)=>s+t.pnl,0);
+  const dailyLossLimit=(rules.dailyLoss/100)*acc.accountSize;
+  const maxDrawdownLimit=(rules.maxDrawdown/100)*acc.accountSize;
+  const targetProfit=(rules.target/100)*acc.accountSize;
+  const daysElapsed=Math.max(0,Math.floor((new Date()-new Date(acc.startDate))/86400000));
+  const daysLeft=Math.max(0,rules.days-daysElapsed);
+  const targetPct=clamp((totalPnl/targetProfit)*100,0,100);
+  const dailyLossPct=clamp((Math.abs(Math.min(0,todayPnl))/dailyLossLimit)*100,0,100);
+  const breachedDaily=todayPnl<=-dailyLossLimit;
+  const breachedMax=totalPnl<=-maxDrawdownLimit;
+  const passed=totalPnl>=targetProfit;
+  const sc=passed?"#00ff88":breachedDaily||breachedMax?"#ff3b5c":"#f0c040";
+  const statusText=passed?"PASSED ✓":breachedDaily?"DAILY BREACH ✗":breachedMax?"MAX DD BREACH ✗":"IN PROGRESS";
+  const portPnl=accounts.reduce((s,a)=>s+a.trades.reduce((ss,t)=>ss+t.pnl,0),0);
+
+  const importTrades = ts=>{ setAccounts(accounts.map(a=>a.id===activeId?{...a,trades:[...a.trades,...ts]}:a)); showToast(`✓ ${ts.length} trade${ts.length>1?"s":""} imported`); };
+  const addTrade = ()=>{ if(!newTrade.pair||!newTrade.pnl)return; const t={...newTrade,id:Date.now(),pnl:parseFloat(newTrade.pnl),lots:parseFloat(newTrade.lots)||0,source:"manual"}; setAccounts(accounts.map(a=>a.id===activeId?{...a,trades:[...a.trades,t]}:a)); setNewTrade({pair:"EUR/USD",type:"BUY",lots:"",entry:"",exit:"",pnl:"",date:todayStr,notes:""}); setShowAddTrade(false); showToast("✓ Trade logged"); };
+  const addAccount = ()=>{ if(!newAcc.name)return; const a={...newAcc,id:Date.now(),accountSize:parseInt(newAcc.accountSize),status:"active",trades:[]}; setAccounts([...accounts,a]); setActiveId(a.id); setShowAddAcc(false); showToast("✓ Account created"); };
+  const handleUpgrade = (planKey)=>{ if(planKey===user.plan)return; setUser({...user,plan:planKey}); showToast(planKey==="free"?"Downgraded to Free":"✓ Plan upgraded! Stripe checkout would open here","#4db8ff"); };
+
+  const parseCSV = text=>{ const lines=text.trim().split("\n").filter(l=>l.trim()); if(lines.length<2)return{trades:[],errors:["Empty file"]}; const headers=lines[0].split(",").map(h=>h.trim().toLowerCase().replace(/['"]/g,"")); const col=key=>{const maps={pair:["symbol","pair","instrument"],type:["type","direction","side","cmd"],lots:["lots","volume","size"],entry:["open","entry","openprice"],exit:["close","exit","closeprice"],pnl:["profit","pnl","p&l","gain"],date:["close time","closetime","date","time"]}; const a=maps[key]||[key]; return headers.findIndex(h=>a.some(x=>h.includes(x)));};
+    const ci={pair:col("pair"),type:col("type"),lots:col("lots"),entry:col("entry"),exit:col("exit"),pnl:col("pnl"),date:col("date")}; const ts=[],errs=[];
+    lines.slice(1).forEach((line,i)=>{ const c=line.split(",").map(x=>x.trim().replace(/['"]/g,"")); try{ const pnlR=ci.pnl>=0?parseFloat(c[ci.pnl]):0; if(isNaN(pnlR)){errs.push(`Row ${i+2}: bad P&L`);return;} const typeR=(ci.type>=0?c[ci.type]:"BUY").toUpperCase(); ts.push({id:Date.now()+i,pair:ci.pair>=0?c[ci.pair]:"UNKNOWN",type:typeR.includes("BUY")||typeR==="0"?"BUY":"SELL",lots:ci.lots>=0?parseFloat(c[ci.lots])||0:0,entry:ci.entry>=0?parseFloat(c[ci.entry])||0:0,exit:ci.exit>=0?parseFloat(c[ci.exit])||0:0,pnl:pnlR,date:ci.date>=0?new Date(c[ci.date]).toISOString().split("T")[0]||todayStr:todayStr,notes:"CSV import",source:"csv"});}catch(e){errs.push(`Row ${i+2}: error`);}}); return{trades:ts,errors:errs};};
+
+  const TABS = [
+    {id:"dash",icon:"⊞",label:"Dash"},
+    {id:"analytics",icon:"◈",label:"Analytics"},
+    {id:"trades",icon:"≡",label:"Trades"},
+    {id:"alerts",icon:"🔔",label:"Alerts"},
+    {id:"plan",icon:"⭐",label:"Plan"},
+    {id:"settings",icon:"⚙",label:"More"},
+  ];
+
+  return (
+    <div style={{fontFamily:"'Times New Roman',Times,serif",background:"#090c12",minHeight:"100vh",color:"#c8d8f0",maxWidth:480,margin:"0 auto",paddingBottom:88}}>
+      <style>{`
+        *{box-sizing:border-box;margin:0;padding:0}
+        ::-webkit-scrollbar{width:3px}::-webkit-scrollbar-thumb{background:#334;border-radius:2px}
+        .card{background:#0f1520;border:1px solid #1e2a40;border-radius:10px;padding:14px}
+        .inf{background:#0a0f1a;border:1px solid #1e2a40;border-radius:8px;padding:10px 12px;color:#c8d8f0;font-family:'Times New Roman',Times,serif;font-size:14px;width:100%;outline:none}
+        .inf:focus{border-color:#3a5080}
+        .btn{padding:11px 18px;border-radius:8px;font-family:'Times New Roman',Times,serif;font-size:13px;cursor:pointer;border:none;font-style:italic}
+        .bp{background:#1e4d8c;color:#c8d8f0}.bp:active{background:#2560b0}
+        .bg{background:transparent;border:1px solid #1e2a40;color:#778}
+        .badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700}
+        .mb{padding:6px 12px;border-radius:20px;border:1px solid #1e2a40;background:transparent;color:#778;font-family:'Times New Roman',Times,serif;font-size:12px;cursor:pointer}
+        .mb.on{border-color:#3a5080;color:#c8d8f0;background:#1a2235}
+        select option{background:#0f1520}
+        .acc-chip{display:inline-flex;align-items:center;gap:5px;padding:6px 12px;border-radius:20px;border:1px solid #1e2a40;background:transparent;color:#778;font-family:'Times New Roman',Times,serif;font-size:11px;cursor:pointer;white-space:nowrap;font-style:italic}
+        .acc-chip.on{border-color:#1e4d8c;background:#1e4d8c22;color:#4db8ff}
+        .nav-item{display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;padding:6px 0;flex:1;border:none;background:transparent;color:#556;font-family:'Times New Roman',Times,serif}
+        .nav-item.on{color:#4db8ff}
+      `}</style>
+
+      {toast && <Toast msg={toast.msg} color={toast.color}/>}
+
+      {/* Header */}
+      <div style={{background:"#090c12",borderBottom:"1px solid #1a2235",padding:"12px 16px",position:"sticky",top:0,zIndex:20}}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+          <div>
+            <div style={{fontSize:19,fontWeight:700,fontStyle:"italic",color:"#e0eaff",letterSpacing:1}}>Piptrak</div>
+            <div style={{fontSize:9,color:"#445",letterSpacing:2}}>Welcome, {user.name}</div>
+          </div>
+          <div style={{display:"flex",gap:10,alignItems:"center"}}>
+            <div style={{fontSize:9,color:user.plan==="elite"?"#c8a0ff":user.plan==="pro"?"#4db8ff":"#445",background:user.plan==="free"?"#1a1a1a":"#1a2235",padding:"3px 10px",borderRadius:20,fontStyle:"italic",cursor:"pointer"}} onClick={()=>setTab("plan")}>
+              {(user.plan||"free").toUpperCase()}
+            </div>
+            <div style={{textAlign:"right"}}>
+              <div style={{fontSize:9,color:"#445"}}>Portfolio</div>
+              <div style={{fontSize:15,fontWeight:700,fontStyle:"italic",color:portPnl>=0?"#00ff88":"#ff3b5c"}}>{fmtUSD(portPnl)}</div>
+            </div>
+          </div>
+        </div>
+        {/* Account chips */}
+        <div style={{display:"flex",gap:6,overflowX:"auto",marginTop:10,paddingBottom:2}}>
+          {accounts.map(a=>{const ap=a.trades.reduce((s,t)=>s+t.pnl,0); const ac=a.status==="passed"?"#00ff88":a.status==="failed"?"#ff3b5c":"#4db8ff"; return(
+            <button key={a.id} className={`acc-chip ${activeId===a.id?"on":""}`} onClick={()=>setActiveId(a.id)}>
+              {a.name} <span style={{color:ap>=0?"#00ff88":"#ff3b5c",fontSize:10}}>{fmtUSD(ap)}</span>
+              <span style={{fontSize:7,color:ac}}>●</span>
+            </button>
+          );})}
+          {(user.plan==="free"?accounts.length<1:true)&&<button className="acc-chip" onClick={()=>{setTab("settings");setShowAddAcc(true);}} style={{color:"#1e4d8c",borderColor:"#1e4d8c44"}}>+ Add</button>}
+        </div>
+      </div>
+
+      <div style={{padding:"14px 14px 0"}}>
+        {/* Status banner */}
+        <div style={{background:`${sc}09`,border:`1px solid ${sc}28`,borderRadius:10,padding:"10px 14px",display:"flex",alignItems:"center",gap:10,marginBottom:14}}>
+          <div style={{width:8,height:8,borderRadius:"50%",background:sc,boxShadow:`0 0 8px ${sc}`,flexShrink:0}}/>
+          <div>
+            <div style={{fontSize:12,color:sc,fontWeight:700,fontStyle:"italic"}}>{statusText}</div>
+            <div style={{fontSize:10,color:"#445"}}>{acc.firm} · ${acc.accountSize.toLocaleString()} · {daysLeft}d left</div>
+          </div>
+          <div style={{marginLeft:"auto",textAlign:"right"}}>
+            <div style={{fontSize:18,fontWeight:700,fontStyle:"italic",color:totalPnl>=0?"#00ff88":"#ff3b5c"}}>{fmtUSD(totalPnl)}</div>
+            <div style={{fontSize:10,color:"#445"}}>{profitPct>=0?"+":""}{profitPct.toFixed(2)}%</div>
+          </div>
+        </div>
+
+        {/* DASHBOARD */}
+        {tab==="dash"&&(
+          <>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:12}}>
+              {[
+                {label:"Win Rate",val:`${winRate}%`,sub:`${wins.length}W · ${losses.length}L`,c:"#4db8ff"},
+                {label:"Avg R:R",val:rr,sub:`W $${avgWin.toFixed(0)} · L $${avgLoss.toFixed(0)}`,c:"#c8a0ff"},
+                {label:"Today P&L",val:fmtUSD(todayPnl),sub:breachedDaily?"⚠ LIMIT HIT":`Limit $${dailyLossLimit.toFixed(0)}`,c:breachedDaily?"#ff3b5c":todayPnl>=0?"#00ff88":"#f0c040"},
+                {label:"Days Left",val:daysLeft,sub:`${daysElapsed} of ${rules.days} elapsed`,c:"#f0c040"},
+              ].map(m=>(
+                <div key={m.label} className="card">
+                  <div style={{fontSize:10,color:"#445",letterSpacing:1,textTransform:"uppercase",marginBottom:6}}>{m.label}</div>
+                  <div style={{fontSize:22,fontWeight:700,fontStyle:"italic",color:m.c}}>{m.val}</div>
+                  <div style={{fontSize:10,color:"#556",marginTop:3}}>{m.sub}</div>
+                </div>
+              ))}
+            </div>
+            {[
+              {label:"Profit Target",val:fmtUSD(totalPnl),max:`$${targetProfit}`,pct:targetPct,g:"linear-gradient(90deg,#1e4d8c,#00ff88)"},
+              {label:"Daily Loss Used",val:`$${Math.abs(Math.min(0,todayPnl)).toFixed(0)}`,max:`$${dailyLossLimit}`,pct:dailyLossPct,g:dailyLossPct>70?"linear-gradient(90deg,#8c1e2a,#ff3b5c)":"linear-gradient(90deg,#8c6a1e,#f0c040)"},
+              {label:"Days Elapsed",val:`${daysElapsed}d`,max:`${rules.days}d`,pct:(daysElapsed/rules.days)*100,g:"linear-gradient(90deg,#1e3a8c,#4db8ff)"},
+            ].map(b=>(
+              <div key={b.label} className="card" style={{padding:"12px 14px",marginBottom:10}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                  <span style={{fontSize:11,color:"#778",fontStyle:"italic"}}>{b.label}</span>
+                  <span style={{fontSize:12,fontWeight:700,color:"#c8d8f0"}}>{b.val} <span style={{color:"#445",fontSize:10}}>/ {b.max}</span></span>
+                </div>
+                <ProgressBar pct={b.pct} gradient={b.g}/>
+              </div>
+            ))}
+            <div className="card" style={{marginBottom:12}}>
+              <div style={{fontSize:11,color:"#445",letterSpacing:2,textTransform:"uppercase",marginBottom:12,fontStyle:"italic"}}>Rules — {acc.firm}</div>
+              {[
+                {r:"Profit Target",v:`${rules.target}%`,a:`$${targetProfit}`,ok:!passed},
+                {r:"Daily Loss",v:`${rules.dailyLoss}%`,a:`$${dailyLossLimit}`,ok:!breachedDaily},
+                {r:"Max Drawdown",v:`${rules.maxDrawdown}%`,a:`$${maxDrawdownLimit}`,ok:!breachedMax},
+                {r:"Min Days",v:`${Math.ceil(rules.days*0.17)}d`,a:`${daysElapsed}d elapsed`,ok:true},
+              ].map((x,i,arr)=>(
+                <div key={x.r} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:i<arr.length-1?"1px solid #1a2235":"none"}}>
+                  <div style={{display:"flex",alignItems:"center",gap:8}}>
+                    <div style={{width:6,height:6,borderRadius:"50%",background:x.ok?"#1e4d8c":"#ff3b5c"}}/>
+                    <span style={{fontSize:13,color:"#aab"}}>{x.r}</span>
+                  </div>
+                  <div style={{textAlign:"right"}}>
+                    <div style={{fontSize:14,fontWeight:700,fontStyle:"italic",color:"#e0eaff"}}>{x.v}</div>
+                    <div style={{fontSize:10,color:"#445"}}>{x.a}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            {/* Equity mini */}
+            <div className="card">
+              <div style={{fontSize:11,color:"#445",letterSpacing:2,textTransform:"uppercase",marginBottom:10,fontStyle:"italic"}}>Equity Curve</div>
+              {trades.length===0?<div style={{height:100,display:"flex",alignItems:"center",justifyContent:"center",color:"#445",fontSize:12,fontStyle:"italic"}}>Log trades to see curve</div>:<EquityCurve trades={trades} accountSize={acc.accountSize} targetProfit={targetProfit} maxDrawdownLimit={maxDrawdownLimit}/>}
+            </div>
+          </>
+        )}
+
+        {/* ANALYTICS */}
+        {tab==="analytics"&&(
+          plan.analytics
+            ? <DeepAnalytics trades={trades} accountSize={acc.accountSize}/>
+            : <div className="card" style={{textAlign:"center",padding:"32px 20px"}}>
+                <div style={{fontSize:32,marginBottom:12}}>📊</div>
+                <div style={{fontSize:16,fontWeight:700,fontStyle:"italic",color:"#e0eaff",marginBottom:8}}>Deep Analytics</div>
+                <div style={{fontSize:13,color:"#556",fontStyle:"italic",marginBottom:20}}>Upgrade to Pro to unlock profit factor, drawdown analysis, best pairs, day-of-week stats and monthly breakdowns.</div>
+                <button className="btn bp" style={{width:"100%"}} onClick={()=>setTab("plan")}>Upgrade to Pro →</button>
+              </div>
+        )}
+
+        {/* TRADES */}
+        {tab==="trades"&&(
+          <>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+              <div style={{fontSize:12,color:"#445",fontStyle:"italic"}}>{trades.length} trades · {acc.name}</div>
+              <div style={{display:"flex",gap:8}}>
+                <input ref={fileRef} type="file" accept=".csv,.txt" style={{display:"none"}} onChange={e=>{const f=e.target.files[0]; if(!f)return; const r=new FileReader(); r.onload=ev=>{const res=parseCSV(ev.target.result); if(res.trades.length)importTrades(res.trades); else showToast("No trades found in CSV","#ff3b5c");}; r.readAsText(f);}}/>
+                <button className="btn bg" style={{padding:"8px 10px",fontSize:11}} onClick={()=>fileRef.current?.click()}>📄 CSV</button>
+                <button className="btn bp" style={{padding:"8px 14px"}} onClick={()=>setShowAddTrade(!showAddTrade)}>+ Log</button>
+              </div>
+            </div>
+            {showAddTrade&&(
+              <div className="card" style={{marginBottom:12}}>
+                <div style={{fontSize:11,color:"#445",letterSpacing:2,textTransform:"uppercase",marginBottom:12,fontStyle:"italic"}}>New Trade</div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:12}}>
+                  <div><div style={{fontSize:11,color:"#778",marginBottom:5}}>Pair</div><select className="inf" value={newTrade.pair} onChange={e=>setNewTrade({...newTrade,pair:e.target.value})}>{Object.keys(PIP_VALUES).map(p=><option key={p}>{p}</option>)}</select></div>
+                  <div><div style={{fontSize:11,color:"#778",marginBottom:5}}>Direction</div><select className="inf" value={newTrade.type} onChange={e=>setNewTrade({...newTrade,type:e.target.value})}><option>BUY</option><option>SELL</option></select></div>
+                  <div><div style={{fontSize:11,color:"#778",marginBottom:5}}>Lots</div><input className="inf" type="number" placeholder="0.1" value={newTrade.lots} onChange={e=>setNewTrade({...newTrade,lots:e.target.value})}/></div>
+                  <div><div style={{fontSize:11,color:"#778",marginBottom:5}}>P&L ($)</div><input className="inf" type="number" placeholder="+200" value={newTrade.pnl} onChange={e=>setNewTrade({...newTrade,pnl:e.target.value})}/></div>
+                  <div><div style={{fontSize:11,color:"#778",marginBottom:5}}>Entry</div><input className="inf" type="number" placeholder="1.0850" value={newTrade.entry} onChange={e=>setNewTrade({...newTrade,entry:e.target.value})}/></div>
+                  <div><div style={{fontSize:11,color:"#778",marginBottom:5}}>Exit</div><input className="inf" type="number" placeholder="1.0920" value={newTrade.exit} onChange={e=>setNewTrade({...newTrade,exit:e.target.value})}/></div>
+                  <div><div style={{fontSize:11,color:"#778",marginBottom:5}}>Date</div><input className="inf" type="date" value={newTrade.date} onChange={e=>setNewTrade({...newTrade,date:e.target.value})}/></div>
+                  <div><div style={{fontSize:11,color:"#778",marginBottom:5}}>Notes</div><input className="inf" placeholder="Setup..." value={newTrade.notes} onChange={e=>setNewTrade({...newTrade,notes:e.target.value})}/></div>
+                </div>
+                <div style={{display:"flex",gap:10}}>
+                  <button className="btn bp" style={{padding:"8px 16px",flex:1}} onClick={addTrade}>Save Trade</button>
+                  <button className="btn bg" style={{padding:"8px 16px"}} onClick={()=>setShowAddTrade(false)}>Cancel</button>
+                </div>
+              </div>
+            )}
+            <div style={{display:"flex",flexDirection:"column",gap:8}}>
+              {trades.length===0&&<div className="card" style={{textAlign:"center",color:"#445",fontStyle:"italic",padding:"28px 0"}}>No trades — log manually or import CSV</div>}
+              {[...trades].reverse().map(t=>(
+                <div key={t.id} className="card" style={{padding:"12px 14px"}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:5}}>
+                    <div style={{display:"flex",alignItems:"center",gap:6}}>
+                      <span style={{fontSize:15,fontWeight:700,color:"#e0eaff"}}>{t.pair}</span>
+                      <span className="badge" style={{background:t.type==="BUY"?"#0d2a1a":"#2a0d14",color:t.type==="BUY"?"#00cc66":"#ff3b5c"}}>{t.type}</span>
+                      <SourceBadge source={t.source||"manual"}/>
+                    </div>
+                    <div style={{fontSize:18,fontWeight:700,fontStyle:"italic",color:t.pnl>=0?"#00ff88":"#ff3b5c"}}>{fmtUSD(t.pnl)}</div>
+                  </div>
+                  <div style={{fontSize:11,color:"#445"}}>{t.date} · {t.lots}L {t.entry?`· ${t.entry}→${t.exit}`:""}</div>
+                  {t.notes&&<div style={{fontSize:11,color:"#556",fontStyle:"italic",marginTop:4}}>{t.notes}</div>}
+                </div>
+              ))}
+            </div>
+            {trades.length>0&&<div style={{textAlign:"right",marginTop:12,fontSize:14,fontWeight:700,fontStyle:"italic",color:totalPnl>=0?"#00ff88":"#ff3b5c"}}>Total: {fmtUSD(totalPnl)}</div>}
+          </>
+        )}
+
+        {/* ALERTS */}
+        {tab==="alerts"&&(
+          plan.alerts
+            ? <NotificationsPanel trades={trades} rules={rules} accountSize={acc.accountSize}/>
+            : <div className="card" style={{textAlign:"center",padding:"32px 20px"}}>
+                <div style={{fontSize:32,marginBottom:12}}>🔔</div>
+                <div style={{fontSize:16,fontWeight:700,fontStyle:"italic",color:"#e0eaff",marginBottom:8}}>Real-Time Alerts</div>
+                <div style={{fontSize:13,color:"#556",fontStyle:"italic",marginBottom:20}}>Get warned before you breach daily loss or max drawdown limits. Push, email & SMS alerts available on Pro.</div>
+                <button className="btn bp" style={{width:"100%"}} onClick={()=>setTab("plan")}>Upgrade to Pro →</button>
+              </div>
+        )}
+
+        {/* PLAN */}
+        {tab==="plan"&&(
+          <>
+            <div style={{fontSize:11,color:"#445",letterSpacing:2,textTransform:"uppercase",marginBottom:14,fontStyle:"italic"}}>Choose Your Plan</div>
+            <PricingPanel currentPlan={user.plan||"free"} onUpgrade={handleUpgrade}/>
+          </>
+        )}
+
+        {/* SETTINGS / MORE */}
+        {tab==="settings"&&(
+          <div>
+            {/* Add account */}
+            <div style={{fontSize:11,color:"#445",letterSpacing:2,textTransform:"uppercase",marginBottom:12,fontStyle:"italic"}}>Accounts</div>
+            {accounts.map(a=>{
+              const ap=a.trades.reduce((s,t)=>s+t.pnl,0);
+              const sc2=a.status==="passed"?"#00ff88":a.status==="failed"?"#ff3b5c":"#4db8ff";
+              const rules2=FIRMS[a.firm];
+              const tgt=(rules2.target/100)*a.accountSize;
+              const prog=clamp((ap/tgt)*100,0,100);
+              return(
+                <div key={a.id} onClick={()=>setActiveId(a.id)} style={{background:activeId===a.id?"#0f1c30":"#0f1520",border:`1px solid ${activeId===a.id?"#1e4d8c":"#1e2a40"}`,borderRadius:10,padding:"14px",cursor:"pointer",marginBottom:10}}>
+                  <div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}>
+                    <div><div style={{fontSize:14,fontWeight:700,color:"#e0eaff"}}>{a.name}</div><div style={{fontSize:11,color:"#445"}}>{a.firm} · ${a.accountSize.toLocaleString()}</div></div>
+                    <div style={{fontSize:20,fontWeight:700,fontStyle:"italic",color:ap>=0?"#00ff88":"#ff3b5c"}}>{fmtUSD(ap)}</div>
+                  </div>
+                  <ProgressBar pct={prog} gradient={`linear-gradient(90deg,#1e4d8c,${sc2})`}/>
+                  <div style={{display:"flex",justifyContent:"space-between",marginTop:5}}><span style={{fontSize:10,color:"#445"}}>Target: {prog.toFixed(0)}%</span><span style={{fontSize:10,color:"#445"}}>{a.trades.length} trades</span></div>
+                </div>
+              );
+            })}
+            <button className="btn bp" style={{width:"100%",padding:"10px",marginBottom:20}} onClick={()=>setShowAddAcc(!showAddAcc)}>+ New Account</button>
+            {showAddAcc&&(
+              <div className="card" style={{marginBottom:20}}>
+                <div style={{fontSize:11,color:"#445",letterSpacing:2,marginBottom:12,fontStyle:"italic",textTransform:"uppercase"}}>Add Account</div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:12}}>
+                  <div><div style={{fontSize:11,color:"#778",marginBottom:5}}>Name</div><input className="inf" placeholder="FTMO #2" value={newAcc.name} onChange={e=>setNewAcc({...newAcc,name:e.target.value})}/></div>
+                  <div><div style={{fontSize:11,color:"#778",marginBottom:5}}>Firm</div><select className="inf" value={newAcc.firm} onChange={e=>setNewAcc({...newAcc,firm:e.target.value})}>{Object.keys(FIRMS).map(f=><option key={f}>{f}</option>)}</select></div>
+                  <div><div style={{fontSize:11,color:"#778",marginBottom:5}}>Size ($)</div><input className="inf" type="number" value={newAcc.accountSize} onChange={e=>setNewAcc({...newAcc,accountSize:e.target.value})}/></div>
+                  <div><div style={{fontSize:11,color:"#778",marginBottom:5}}>Start Date</div><input className="inf" type="date" value={newAcc.startDate} onChange={e=>setNewAcc({...newAcc,startDate:e.target.value})}/></div>
+                </div>
+                <div style={{display:"flex",gap:10}}><button className="btn bp" style={{padding:"8px 16px",flex:1}} onClick={addAccount}>Create</button><button className="btn bg" style={{padding:"8px 16px"}} onClick={()=>setShowAddAcc(false)}>Cancel</button></div>
+              </div>
+            )}
+
+            {/* Journal */}
+            <div style={{fontSize:11,color:"#445",letterSpacing:2,textTransform:"uppercase",marginBottom:12,fontStyle:"italic"}}>Trading Journal</div>
+            <div className="card" style={{marginBottom:20}}>
+              <div style={{fontSize:12,color:"#778",marginBottom:10}}>Mindset</div>
+              <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:14}}>
+                {["focused","confident","anxious","revenge","bored","patient"].map(m=>(
+                  <button key={m} className={`mb ${mood===m?"on":""}`} onClick={()=>setMood(m)}>{m}</button>
+                ))}
+              </div>
+              <textarea className="inf" rows={5} placeholder="Today's session notes..." value={journal} onChange={e=>setJournal(e.target.value)} style={{resize:"vertical",fontStyle:"italic"}}/>
+              <button className="btn bp" style={{marginTop:10,width:"100%"}} onClick={()=>showToast("✓ Journal saved")}>Save Entry</button>
+            </div>
+
+            {/* Account info */}
+            <div style={{fontSize:11,color:"#445",letterSpacing:2,textTransform:"uppercase",marginBottom:12,fontStyle:"italic"}}>Account</div>
+            <div className="card">
+              {[{l:"Email",v:user.email},{l:"Plan",v:(user.plan||"free").toUpperCase()},{l:"Member since",v:user.createdAt||today()}].map((x,i,arr)=>(
+                <div key={x.l} style={{display:"flex",justifyContent:"space-between",padding:"9px 0",borderBottom:i<arr.length-1?"1px solid #1a2235":"none"}}>
+                  <span style={{fontSize:13,color:"#778",fontStyle:"italic"}}>{x.l}</span>
+                  <span style={{fontSize:13,color:"#c8d8f0",fontWeight:700}}>{x.v}</span>
+                </div>
+              ))}
+              <button className="btn bg" style={{width:"100%",marginTop:12}} onClick={()=>{setUser(null);setOnboarded(false);setAccounts([]);showToast("Signed out","#f0c040");}}>Sign Out</button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Bottom Nav */}
+      <div style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:480,background:"#090c12",borderTop:"1px solid #1a2235",display:"flex",zIndex:20,padding:"4px 0 10px"}}>
+        {TABS.map(t=>(
+          <button key={t.id} className={`nav-item ${tab===t.id?"on":""}`} onClick={()=>setTab(t.id)}>
+            <span style={{fontSize:16}}>{t.icon}</span>
+            <span style={{fontSize:9}}>{t.label}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
