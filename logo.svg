@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
+  <defs>
+    <linearGradient id="hexGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1e4d8c;stop-opacity:1"/>
+      <stop offset="100%" style="stop-color:#0d2a50;stop-opacity:1"/>
+    </linearGradient>
+    <linearGradient id="lineGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#1e4d8c;stop-opacity:1"/>
+      <stop offset="100%" style="stop-color:#00ff88;stop-opacity:1"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="2" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <!-- Hexagon background -->
+  <polygon points="100,15 175,57.5 175,142.5 100,185 25,142.5 25,57.5"
+    fill="url(#hexGrad)" stroke="#1e4d8c" stroke-width="2"/>
+
+  <!-- Inner hex outline -->
+  <polygon points="100,28 163,64.5 163,135.5 100,172 37,135.5 37,64.5"
+    fill="none" stroke="#1e4d8c" stroke-width="1" opacity="0.5"/>
+
+  <!-- Chart line (equity curve style) -->
+  <polyline points="52,130 72,118 88,124 108,95 124,105 148,72"
+    fill="none" stroke="url(#lineGrad)" stroke-width="4"
+    stroke-linecap="round" stroke-linejoin="round" filter="url(#glow)"/>
+
+  <!-- Dots on line -->
+  <circle cx="52"  cy="130" r="4" fill="#1e4d8c"/>
+  <circle cx="88"  cy="124" r="4" fill="#1e4d8c"/>
+  <circle cx="108" cy="95"  r="4" fill="#4db8ff"/>
+  <circle cx="148" cy="72"  r="5" fill="#00ff88" filter="url(#glow)"/>
+
+  <!-- Pip dot accent -->
+  <circle cx="148" cy="72" r="9" fill="none" stroke="#00ff88" stroke-width="1.5" opacity="0.4"/>
+</svg>

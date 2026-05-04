@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Affiliate Dashboard · Piptrak</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg"/>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Times New Roman',Times,serif;background:#090c12;color:#c8d8f0;min-height:100vh;padding-bottom:40px}
+    nav{background:#090c12;border-bottom:1px solid #1a2235;padding:14px 20px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:10}
+    .logo{font-size:20px;font-weight:700;font-style:italic;color:#e0eaff;text-decoration:none}
+    .logo span{color:#4db8ff}
+    .nav-tag{font-size:10px;color:#445;letter-spacing:2px;border:1px solid #1e2a40;padding:3px 10px;border-radius:20px;font-style:italic}
+    .wrap{max-width:900px;margin:0 auto;padding:28px 20px}
+    h1{font-size:28px;font-weight:700;font-style:italic;color:#e0eaff;margin-bottom:6px}
+    .sub{font-size:13px;color:#445;font-style:italic;margin-bottom:28px}
+    .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
+    .grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px}
+    .card{background:#0f1520;border:1px solid #1e2a40;border-radius:10px;padding:18px}
+    .section-title{font-size:10px;color:#445;letter-spacing:3px;text-transform:uppercase;font-style:italic;margin:28px 0 14px}
+    .label{font-size:10px;color:#445;letter-spacing:1px;text-transform:uppercase;margin-bottom:8px}
+    .big{font-size:28px;font-weight:700;font-style:italic}
+    .small{font-size:11px;color:#556;margin-top:4px;font-style:italic}
+    .link-box{background:#0a0f1a;border:1px solid #1e4d8c;border-radius:8px;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+    .link-url{font-size:13px;color:#4db8ff;font-style:italic;word-break:break-all;flex:1}
+    .copy-btn{background:#1e4d8c;color:#c8d8f0;border:none;padding:8px 16px;border-radius:6px;font-family:'Times New Roman',Times,serif;font-size:12px;font-style:italic;cursor:pointer;white-space:nowrap;transition:background 0.2s;flex-shrink:0}
+    .copy-btn:hover{background:#2560b0}
+    .copy-btn.copied{background:#0d2a1a;color:#00ff88;border:1px solid #00ff8833}
+    table{width:100%;border-collapse:collapse}
+    th{font-size:9px;color:#334;letter-spacing:2px;text-transform:uppercase;padding:8px 0;border-bottom:1px solid #1e2a40;text-align:left;font-weight:400}
+    td{font-size:13px;color:#aab;padding:12px 0;border-bottom:1px solid #1a2235;font-style:italic}
+    td.green{color:#00ff88;font-weight:700}
+    td.gold{color:#f0c040}
+    td.red{color:#ff3b5c}
+    .badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;letter-spacing:0.5px}
+    .badge-green{background:#0d2a1a;color:#00ff88}
+    .badge-gold{background:#2a1e0a;color:#f0c040}
+    .badge-blue{background:#0a1a2a;color:#4db8ff}
+    .pbar{height:4px;background:#1e2a40;border-radius:2px;overflow:hidden;margin-top:8px}
+    .pfill{height:100%;border-radius:2px}
+    .info-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+    .info-card{background:#0a0f1a;border:1px solid #1e2a40;border-radius:8px;padding:14px;text-align:center}
+    .info-val{font-size:22px;font-weight:700;font-style:italic;color:#e0eaff}
+    .info-label{font-size:10px;color:#445;margin-top:4px;font-style:italic}
+    .withdraw-btn{background:#1e4d8c;color:#c8d8f0;border:none;padding:11px 24px;border-radius:8px;font-family:'Times New Roman',Times,serif;font-size:13px;font-style:italic;cursor:pointer;width:100%;margin-top:14px;transition:background 0.2s}
+    .withdraw-btn:hover{background:#2560b0}
+    .withdraw-btn:disabled{background:#1a2235;color:#445;cursor:not-allowed}
+    .promo-box{background:#0a1220;border:1px solid #1e4d8c44;border-radius:10px;padding:18px;margin-bottom:12px}
+    .promo-title{font-size:14px;font-weight:700;font-style:italic;color:#e0eaff;margin-bottom:6px}
+    .promo-desc{font-size:12px;color:#556;font-style:italic;margin-bottom:12px}
+    pre{background:#0a0f1a;border:1px solid #1e2a40;border-radius:6px;padding:12px;font-size:11px;color:#4db8ff;overflow-x:auto;line-height:1.6;white-space:pre-wrap}
+    @media(max-width:600px){.grid4{grid-template-columns:1fr 1fr}.info-grid{grid-template-columns:1fr 1fr}.grid2{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+<nav>
+  <a href="/" class="logo">Pip<span>trak</span></a>
+  <span class="nav-tag">AFFILIATE DASHBOARD</span>
+  <div style="font-size:12px;color:#445;font-style:italic">demo@piptrak.com</div>
+</nav>
+
+<div class="wrap">
+  <h1>Affiliate Dashboard</h1>
+  <div class="sub">Earn 30% recurring commission on every paying user you refer</div>
+
+  <!-- Earnings overview -->
+  <div class="grid4">
+    <div class="card">
+      <div class="label">Total Earned</div>
+      <div class="big" style="color:#00ff88">$342.00</div>
+      <div class="small">All time</div>
+    </div>
+    <div class="card">
+      <div class="label">This Month</div>
+      <div class="big" style="color:#4db8ff">$127.50</div>
+      <div class="small">8 active referrals</div>
+    </div>
+    <div class="card">
+      <div class="label">Pending Payout</div>
+      <div class="big" style="color:#f0c040">$97.50</div>
+      <div class="small">Pays out 1st of month</div>
+    </div>
+    <div class="card">
+      <div class="label">Conversion Rate</div>
+      <div class="big" style="color:#c8a0ff">14.2%</div>
+      <div class="small">Clicks → signups</div>
+    </div>
+  </div>
+
+  <!-- Referral link -->
+  <div class="section-title">Your Referral Link</div>
+  <div class="card" style="margin-bottom:14px">
+    <div style="font-size:11px;color:#445;font-style:italic;margin-bottom:10px">Share this link — you earn 30% of every subscription payment, recurring for life</div>
+    <div class="link-box">
+      <div class="link-url" id="ref-url">https://piptrak.com/?ref=demo123</div>
+      <button class="copy-btn" id="copy-btn" onclick="copyLink()">Copy link</button>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:12px;flex-wrap:wrap">
+      <button onclick="copyText('Check out Piptrak — it helped me pass my FTMO challenge by tracking my daily loss limits in real time. Try it free: https://piptrak.com/?ref=demo123')" class="copy-btn" style="background:#0f1520;border:1px solid #1e2a40;color:#778">📋 Copy tweet</button>
+      <button onclick="copyText('https://piptrak.com/?ref=demo123')" class="copy-btn" style="background:#0f1520;border:1px solid #1e2a40;color:#778">🔗 Short link</button>
+    </div>
+  </div>
+
+  <!-- Traffic stats -->
+  <div class="grid2" style="margin-bottom:14px">
+    <div class="card">
+      <div class="label">Traffic This Month</div>
+      <div style="display:flex;justify-content:space-between;margin-top:12px">
+        {[["Clicks","284"],["Signups","40"],["Trials","18"],["Paid","12"]].map(([l,v])=>``)}
+      </div>
+      <div style="display:flex;justify-content:space-between">
+        <div style="text-align:center"><div style="font-size:20px;font-weight:700;font-style:italic;color:#e0eaff">284</div><div style="font-size:10px;color:#445;margin-top:3px;font-style:italic">Clicks</div></div>
+        <div style="text-align:center"><div style="font-size:20px;font-weight:700;font-style:italic;color:#4db8ff">40</div><div style="font-size:10px;color:#445;margin-top:3px;font-style:italic">Signups</div></div>
+        <div style="text-align:center"><div style="font-size:20px;font-weight:700;font-style:italic;color:#f0c040">18</div><div style="font-size:10px;color:#445;margin-top:3px;font-style:italic">Trials</div></div>
+        <div style="text-align:center"><div style="font-size:20px;font-weight:700;font-style:italic;color:#00ff88">12</div><div style="font-size:10px;color:#445;margin-top:3px;font-style:italic">Paid</div></div>
+      </div>
+      <div class="pbar" style="margin-top:16px"><div class="pfill" style="width:14%;background:linear-gradient(90deg,#1e4d8c,#00ff88)"></div></div>
+      <div style="font-size:10px;color:#445;margin-top:6px;font-style:italic">14.1% click → paid conversion</div>
+    </div>
+    <div class="card">
+      <div class="label">Payout Progress</div>
+      <div style="font-size:32px;font-weight:700;font-style:italic;color:#f0c040;margin:12px 0 4px">$97.50</div>
+      <div style="font-size:11px;color:#556;font-style:italic;margin-bottom:14px">Minimum payout: $50 · Next payout: June 1</div>
+      <div class="pbar"><div class="pfill" style="width:100%;background:linear-gradient(90deg,#8c6a1e,#f0c040)"></div></div>
+      <div style="font-size:10px;color:#00ff88;margin-top:6px;font-style:italic">✓ Above minimum — will pay out June 1</div>
+      <button class="withdraw-btn">Request early payout</button>
+    </div>
+  </div>
+
+  <!-- Commission table -->
+  <div class="section-title">Commission Structure</div>
+  <div class="card" style="margin-bottom:14px">
+    <div class="info-grid">
+      <div class="info-card">
+        <div class="info-val" style="color:#4db8ff">30%</div>
+        <div class="info-label">Standard commission</div>
+      </div>
+      <div class="info-card">
+        <div class="info-val" style="color:#c8a0ff">Lifetime</div>
+        <div class="info-label">Recurring — paid monthly</div>
+      </div>
+      <div class="info-card">
+        <div class="info-val" style="color:#00ff88">$50</div>
+        <div class="info-label">Minimum payout</div>
+      </div>
+    </div>
+    <div style="margin-top:16px">
+      <table>
+        <tr><th>Plan</th><th>Price</th><th>Your cut/mo</th><th>Your cut/yr (annual)</th></tr>
+        <tr><td>Pro Monthly</td><td>$15</td><td class="green">$4.50</td><td style="color:#445">—</td></tr>
+        <tr><td>Pro Annual</td><td>$135</td><td style="color:#445">—</td><td class="green">$40.50</td></tr>
+        <tr><td>Elite Monthly</td><td>$39</td><td class="green">$11.70</td><td style="color:#445">—</td></tr>
+        <tr><td>Elite Annual</td><td>$351</td><td style="color:#445">—</td><td class="green">$105.30</td></tr>
+      </table>
+      <div style="font-size:11px;color:#445;margin-top:10px;font-style:italic">
+        Top affiliates (20+ paid referrals) earn 40% commission. Contact us to unlock.
+      </div>
+    </div>
+  </div>
+
+  <!-- Recent referrals -->
+  <div class="section-title">Recent Referrals</div>
+  <div class="card" style="margin-bottom:14px">
+    <table>
+      <tr><th>Date</th><th>User</th><th>Plan</th><th>Status</th><th>Your earnings</th></tr>
+      <tr>
+        <td>2025-04-28</td><td>j***@gmail.com</td><td>Pro Monthly</td>
+        <td><span class="badge badge-green">ACTIVE</span></td>
+        <td class="green">$4.50/mo</td>
+      </tr>
+      <tr>
+        <td>2025-04-26</td><td>s***@hotmail.com</td><td>Elite Monthly</td>
+        <td><span class="badge badge-green">ACTIVE</span></td>
+        <td class="green">$11.70/mo</td>
+      </tr>
+      <tr>
+        <td>2025-04-24</td><td>d***@yahoo.com</td><td>Pro Annual</td>
+        <td><span class="badge badge-green">ACTIVE</span></td>
+        <td class="green">$40.50 paid</td>
+      </tr>
+      <tr>
+        <td>2025-04-22</td><td>m***@gmail.com</td><td>Pro Monthly</td>
+        <td><span class="badge badge-gold">TRIAL</span></td>
+        <td class="gold">Pending</td>
+      </tr>
+      <tr>
+        <td>2025-04-20</td><td>k***@outlook.com</td><td>Free</td>
+        <td><span class="badge badge-blue">FREE</span></td>
+        <td style="color:#445">$0 (not paid)</td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- Promo materials -->
+  <div class="section-title">Promotional Materials</div>
+  <div class="promo-box">
+    <div class="promo-title">📝 Ready-to-post tweet</div>
+    <div class="promo-desc">Copy, paste, post. Works well on prop firm Twitter/X.</div>
+    <pre>Failed 3 FTMO challenges before this.
+
+The problem wasn't my strategy — I kept breaching the daily loss limit on bad days.
+
+Started using @Piptrak and it alerts me before I hit my limit.
+
+Passed on my next attempt. 100% worth it.
+
+Try it free 👇
+https://piptrak.com/?ref=demo123</pre>
+    <button onclick="copyText(document.querySelector('pre').textContent)" class="copy-btn" style="margin-top:10px">Copy tweet</button>
+  </div>
+
+  <div class="promo-box">
+    <div class="promo-title">💬 Reddit comment template</div>
+    <div class="promo-desc">Use naturally in r/Forex, r/propfirms, r/Forexnoobs when someone asks about challenge tracking.</div>
+    <pre>I use Piptrak for this — it tracks your challenge rules in real time and alerts you when you're close to the daily loss limit. Has a free tier and works with MT4/MT5 via CSV import. Saved my last challenge when I was about to overtrade on a revenge trading day.
+
+Link if useful: https://piptrak.com/?ref=demo123</pre>
+    <button onclick="copyText(document.querySelectorAll('pre')[1].textContent)" class="copy-btn" style="margin-top:10px">Copy comment</button>
+  </div>
+
+  <div class="promo-box">
+    <div class="promo-title">📧 Email / DM template</div>
+    <div class="promo-desc">For personal outreach to traders in your network.</div>
+    <pre>Hey [name],
+
+Thought you'd find this useful — I've been using Piptrak to track my prop firm challenges and it's genuinely helped me stay disciplined.
+
+The daily loss alert is the best feature — it notifies me before I hit my limit so I don't blow the challenge on an emotional trading day.
+
+Free to start, Pro is $15/month if you want broker sync and alerts.
+
+Worth checking out: https://piptrak.com/?ref=demo123</pre>
+    <button onclick="copyText(document.querySelectorAll('pre')[2].textContent)" class="copy-btn" style="margin-top:10px">Copy message</button>
+  </div>
+
+</div>
+
+<script>
+  function copyLink() {
+    const url = document.getElementById("ref-url").textContent;
+    navigator.clipboard.writeText(url).then(() => {
+      const btn = document.getElementById("copy-btn");
+      btn.textContent = "✓ Copied!";
+      btn.classList.add("copied");
+      setTimeout(() => { btn.textContent = "Copy link"; btn.classList.remove("copied"); }, 2000);
+    });
+  }
+
+  function copyText(text) {
+    navigator.clipboard.writeText(text.trim()).then(() => {
+      const btns = document.querySelectorAll(".copy-btn");
+      // Simple feedback via alert for demo
+      const el = event.target;
+      const orig = el.textContent;
+      el.textContent = "✓ Copied!";
+      el.classList.add("copied");
+      setTimeout(() => { el.textContent = orig; el.classList.remove("copied"); }, 2000);
+    });
+  }
+</script>
+</body>
+</html>
